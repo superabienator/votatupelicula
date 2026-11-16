@@ -7,6 +7,8 @@ import {
   Ticket,
   Trash2,
 } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
+import { getLocalizedMovie } from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
 import { hexToRgba } from '../utils/colorExtractor';
@@ -35,25 +37,26 @@ export function RankingDock({
   onClearAll,
   onConfirmOrder,
 }: RankingDockProps) {
+  const { lang, t } = useI18n();
   const isComplete = rankedMovies.length === topK;
   const emptySlotsCount = Math.max(0, topK - rankedMovies.length);
 
   return (
     <aside
-      aria-label="Tu lista de preferencias"
+      aria-label={t.dockTitle}
       className="cinema-marquee rounded-3xl border border-white/20 bg-gradient-to-b from-[#1e264a]/95 to-[#161c38]/95 p-5 shadow-2xl backdrop-blur-xl"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-300">
             <Ticket className="h-3.5 w-3.5" />
-            Tu TOP {topK} Preferencial
+            {t.dockTopPrefix(topK)}
           </span>
           <h2 className="mt-1 font-display text-xl font-extrabold text-white">
-            Ordena tus favoritas
+            {t.dockTitle}
           </h2>
           <p className="mt-0.5 text-xs text-slate-400">
-            Arrastra para reordenar o usa las flechas ↑ ↓
+            {t.dockSubtitle}
           </p>
         </div>
 
@@ -65,8 +68,8 @@ export function RankingDock({
             <button
               type="button"
               onClick={onClearAll}
-              title="Vaciar selección"
-              aria-label="Vaciar selección"
+              title={t.clearSelectionAria}
+              aria-label={t.clearSelectionAria}
               className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -88,6 +91,7 @@ export function RankingDock({
               const rank = index + 1;
               const pts = getBordaPoints(rank, topK, scoringMode);
               const medal = getRankMedal(rank);
+              const localized = getLocalizedMovie(movie, lang);
 
               return (
                 <Reorder.Item
@@ -110,7 +114,7 @@ export function RankingDock({
 
                   <div className="h-12 w-8 shrink-0 overflow-hidden rounded-lg border border-white/10">
                     <MoviePoster
-                      title={movie.title}
+                      title={localized.title}
                       posterUrl={movie.poster_url}
                       palette={movie.palette}
                       compact
@@ -119,9 +123,9 @@ export function RankingDock({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-white">{movie.title}</p>
+                    <p className="truncate text-sm font-bold text-white">{localized.title}</p>
                     <p className="text-[11px] text-slate-400">
-                      {rank}ª opción · {formatPointsLabel(pts)}
+                      {t.rankOptionLabel(rank)} · {formatPointsLabel(pts)}
                     </p>
                   </div>
 
@@ -170,7 +174,7 @@ export function RankingDock({
               className="flex items-center justify-between rounded-2xl border border-dashed border-white/15 bg-black/25 px-3.5 py-3 text-xs text-slate-400"
             >
               <span>
-                Espacio libre para tu <strong className="text-slate-200">{slotRank}ª opción</strong>
+                <strong className="text-slate-200">{t.emptySlotLabel(slotRank)}</strong>
               </span>
               <span className="font-mono text-[11px] text-slate-500">
                 +{formatPointsLabel(pts)}
@@ -196,10 +200,10 @@ export function RankingDock({
         >
           <Ticket className="h-4 w-4" />
           {!votingOpen
-            ? 'Votación cerrada por el centro'
+            ? t.closedByAdmin
             : isComplete
-              ? 'Revisar Entrada de Cine y Votar →'
-              : `Elige ${emptySlotsCount} película${emptySlotsCount === 1 ? '' : 's'} más`}
+              ? t.reviewTicketBtn
+              : t.pickMoreMovies(emptySlotsCount)}
         </button>
       </div>
     </aside>

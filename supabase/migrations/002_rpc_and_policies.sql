@@ -155,7 +155,7 @@ BEGIN
     RETURN jsonb_build_object(
       'ok', false,
       'error_code', 'VOTING_CLOSED',
-      'message', 'La votación ha sido cerrada por el profesorado.'
+      'message', 'La votación ha sido cerrada por el usuario administrador.'
     );
   END IF;
 

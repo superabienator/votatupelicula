@@ -1,5 +1,11 @@
 import { motion } from 'framer-motion';
-import { Clock, Expand, Sparkles } from 'lucide-react';
+import { Clock, Expand, ExternalLink, PlayCircle, Sparkles } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
+import {
+  LANGUAGE_LABELS,
+  getLocalizedMovie,
+  resolveMovieTrailer,
+} from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatDuration, formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
 import { hexToRgba } from '../utils/colorExtractor';
@@ -12,6 +18,7 @@ interface MovieCardProps {
   assignedRank: number | null; // 1-indexed o null
   onAssignRank: (movieId: string, rank: number) => void;
   onInspectMovie: (movie: Movie) => void;
+  onWatchTrailer: (movie: Movie) => void;
   onHoverMovie?: (movie: Movie | null) => void;
   disabled?: boolean;
   priority?: boolean;
@@ -24,10 +31,14 @@ export function MovieCard({
   assignedRank,
   onAssignRank,
   onInspectMovie,
+  onWatchTrailer,
   onHoverMovie,
   disabled = false,
   priority = false,
 }: MovieCardProps) {
+  const { lang, t } = useI18n();
+  const localized = getLocalizedMovie(movie, lang);
+  const trailer = resolveMovieTrailer(movie, lang);
   const medal = assignedRank ? getRankMedal(assignedRank) : null;
   const ranks = Array.from({ length: topK }, (_, i) => i + 1);
 
@@ -62,11 +73,11 @@ export function MovieCard({
         <button
           type="button"
           onClick={() => onInspectMovie(movie)}
-          aria-label={`Ver ficha completa de ${movie.title}`}
+          aria-label={t.inspectMovieAria(localized.title)}
           className="relative h-44 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-lg transition duration-300 group-hover:scale-[1.02] sm:h-48 sm:w-32"
         >
           <MoviePoster
-            title={movie.title}
+            title={localized.title}
             year={movie.year}
             posterUrl={movie.poster_url}
             palette={movie.palette}
@@ -86,7 +97,7 @@ export function MovieCard({
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="font-display text-lg font-bold leading-snug text-white sm:text-xl">
-                {movie.title}
+                {localized.title}
               </h3>
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-400">
                 {movie.year && <span className="font-mono">{movie.year}</span>}
@@ -96,7 +107,7 @@ export function MovieCard({
                     {formatDuration(movie.duration_minutes)}
                   </span>
                 )}
-                {movie.genres.slice(0, 2).map((genre) => (
+                {localized.genres.slice(0, 2).map((genre) => (
                   <span
                     key={genre}
                     className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-300"
@@ -120,13 +131,13 @@ export function MovieCard({
           </div>
 
           <p className="mt-2.5 line-clamp-3 text-xs leading-relaxed text-slate-300 sm:text-sm">
-            {movie.synopsis}
+            {localized.synopsis}
           </p>
 
           {/* Etiquetas temáticas */}
-          {movie.tags.length > 0 && (
+          {localized.tags.length > 0 && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {movie.tags.slice(0, 3).map((tag) => (
+              {localized.tags.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
                   className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
@@ -143,13 +154,39 @@ export function MovieCard({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => onInspectMovie(movie)}
-            className="mt-2 self-start text-[11px] font-semibold text-sky-300 underline-offset-2 hover:underline"
-          >
-            Ver ficha completa
-          </button>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onInspectMovie(movie)}
+              className="text-[11px] font-semibold text-sky-300 underline-offset-2 hover:underline"
+            >
+              {t.seeFullDetails}
+            </button>
+
+            {trailer.url && trailer.activeLang && (
+              <>
+                <span className="text-slate-600">·</span>
+                <button
+                  type="button"
+                  onClick={() => onWatchTrailer(movie)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-200 transition hover:bg-amber-400/25"
+                >
+                  <PlayCircle className="h-3 w-3" />
+                  {t.watchTrailer} ({LANGUAGE_LABELS[trailer.activeLang].code})
+                </button>
+                <a
+                  href={trailer.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={t.openTrailerExternal}
+                  aria-label={`${t.openTrailerExternal} - ${localized.title}`}
+                  className="inline-flex items-center gap-1 text-[11px] text-slate-300 transition hover:text-white"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -158,8 +195,8 @@ export function MovieCard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[11px] font-medium text-slate-400">
             {assignedRank
-              ? `Tu ${assignedRank}ª preferencia (pulsa para cambiar o quitar)`
-              : 'Elige su posición en tu TOP:'}
+              ? t.rankSelectedHint(assignedRank)
+              : t.rankPromptHint}
           </span>
           <div className="flex flex-wrap gap-1.5">
             {ranks.map((rank) => {

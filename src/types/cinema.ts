@@ -4,10 +4,27 @@ export type ScoringMode = 'classic' | 'fractional';
 
 export type ThemeMode = 'featured' | 'blend';
 
+export type AppLanguage = 'es' | 'va' | 'en';
+
+export interface MovieLocalizedFields {
+  title?: string;
+  synopsis?: string;
+  genres?: string[];
+  tags?: string[];
+}
+
+export interface MovieTrailers {
+  es?: string;
+  va?: string;
+  en?: string;
+}
+
 export interface MoviePalette {
   primary: string;
   secondary: string;
   accent: string;
+  i18n?: Partial<Record<AppLanguage, MovieLocalizedFields>>;
+  trailers?: MovieTrailers;
 }
 
 export interface Movie {
@@ -23,6 +40,8 @@ export interface Movie {
   poster_url: string;
   backdrop_url: string;
   palette: MoviePalette;
+  translations?: Partial<Record<AppLanguage, MovieLocalizedFields>>;
+  trailers?: MovieTrailers;
   tmdb_id?: number | null;
   source_provider?: 'tmdb' | 'omdb' | 'gemini' | 'manual';
   status: MovieStatus;

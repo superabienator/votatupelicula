@@ -54,6 +54,22 @@ let movies: Movie[] = [
     poster_url: 'https://image.tmdb.org/t/p/w780/nrSaXF39nDfAAeLKksRCyvSzI2a.jpg',
     backdrop_url: 'https://image.tmdb.org/t/p/w1280/xJHokMbljvjADYdit5fK5VQsXEG.jpg',
     palette: { primary: '#38bdf8', secondary: '#f59e0b', accent: '#6366f1' },
+    translations: {
+      va: {
+        title: 'Interstellar',
+        synopsis:
+          'Quan la Terra es torna inhabitable, un equip d’exploradors travessa un forat de cuc per a buscar una nova llar per a la humanitat.',
+      },
+      en: {
+        title: 'Interstellar',
+        synopsis:
+          'As Earth becomes uninhabitable, a team of explorers travels through a wormhole in search of a new home for humanity.',
+      },
+    },
+    trailers: {
+      es: 'https://www.youtube.com/watch?v=UoSSbmD9vqc',
+      en: 'https://www.youtube.com/watch?v=zSWdZVtXT7E',
+    },
     tmdb_id: 157336,
     source_provider: 'tmdb',
     status: 'published',
@@ -73,6 +89,23 @@ let movies: Movie[] = [
     poster_url: 'https://image.tmdb.org/t/p/w780/37WcNMg5leBhGMM6n3M0G4R1l9l.jpg',
     backdrop_url: 'https://image.tmdb.org/t/p/w1280/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg',
     palette: { primary: '#f43f5e', secondary: '#8b5cf6', accent: '#22d3ee' },
+    translations: {
+      va: {
+        title: 'Spider-Man: Travessant el Multivers',
+        synopsis:
+          'Miles Morales salta entre universos amb Gwen Stacy i descobreix una societat de Spider-Herois que posarà a prova el seu propi destí.',
+      },
+      en: {
+        title: 'Spider-Man: Across the Spider-Verse',
+        synopsis:
+          'Miles Morales catapults across the Multiverse with Gwen Stacy and encounters a team of Spider-People charged with protecting its existence.',
+      },
+    },
+    trailers: {
+      es: 'https://www.youtube.com/watch?v=oBmazlyP220',
+      va: 'https://www.youtube.com/watch?v=shW9i6k8cB0',
+      en: 'https://www.youtube.com/watch?v=cqGjhVJWtEg',
+    },
     tmdb_id: 569094,
     source_provider: 'tmdb',
     status: 'published',
@@ -92,6 +125,22 @@ let movies: Movie[] = [
     poster_url: 'https://image.tmdb.org/t/p/w780/k7rEpSRHermico35FF93592020.jpg',
     backdrop_url: 'https://image.tmdb.org/t/p/w1280/vdpE5pjJVql5aD6pnzRqlFmgxXf.jpg',
     palette: { primary: '#60a5fa', secondary: '#0284c7', accent: '#f97316' },
+    translations: {
+      va: {
+        title: 'La societat de la neu',
+        synopsis:
+          'El 1972, el vol 571 s’estavella als Andes. Els supervivents hauran d’unir-se més enllà d’allò imaginable per resistir al fred extrem.',
+      },
+      en: {
+        title: 'Society of the Snow',
+        synopsis:
+          'In 1972, Flight 571 crashes in the Andes. The survivors must band together in extreme conditions to find their way back home.',
+      },
+    },
+    trailers: {
+      es: 'https://www.youtube.com/watch?v=l9tP4M8URhQ',
+      en: 'https://www.youtube.com/watch?v=pDak4qLyF4Q',
+    },
     tmdb_id: 906126,
     source_provider: 'tmdb',
     status: 'published',
@@ -111,6 +160,22 @@ let movies: Movie[] = [
     poster_url: 'https://image.tmdb.org/t/p/w780/x2L3j2W2wX5e6yV6bH6rM7j3c0z.jpg',
     backdrop_url: 'https://image.tmdb.org/t/p/w1280/stKGOm8UyhuLPR9sZLjs5AkmncA.jpg',
     palette: { primary: '#fb923c', secondary: '#ec4899', accent: '#facc15' },
+    translations: {
+      va: {
+        title: 'Del revés 2 (Inside Out 2)',
+        synopsis:
+          'Riley entra en l’adolescència i la seu central de la seua ment rep una visita inesperada: Ansietat, Enveja, Vergonya i Tedi.',
+      },
+      en: {
+        title: 'Inside Out 2',
+        synopsis:
+          'Riley enters her teenage years as Headquarters undergoes a sudden demolition to make room for brand-new Emotions like Anxiety.',
+      },
+    },
+    trailers: {
+      es: 'https://www.youtube.com/watch?v=xiC2iXTXHxw',
+      en: 'https://www.youtube.com/watch?v=LEjhY15eCx0',
+    },
     tmdb_id: 1022789,
     source_provider: 'tmdb',
     status: 'published',
@@ -130,6 +195,22 @@ let movies: Movie[] = [
     poster_url: 'https://image.tmdb.org/t/p/w780/vlsi5iZcfDChK54kK0yW2N9u8bK.jpg',
     backdrop_url: 'https://image.tmdb.org/t/p/w1280/Ab8mkHmkYADjU7wQiOkia9BzGvS.jpg',
     palette: { primary: '#10b981', secondary: '#ec4899', accent: '#fbbf24' },
+    translations: {
+      va: {
+        title: 'El viatge de Chihiro',
+        synopsis:
+          'Chihiro queda atrapada en un món màgic habitat per esperits i déus. Amb valentia i enginy lluitarà per alliberar la seua família.',
+      },
+      en: {
+        title: 'Spirited Away',
+        synopsis:
+          'Chihiro wanders into a magical world ruled by spirits and gods, where she must find the courage to rescue her family.',
+      },
+    },
+    trailers: {
+      es: 'https://www.youtube.com/watch?v=5-oy33zF0L4',
+      en: 'https://www.youtube.com/watch?v=ByXuk9QqQkk',
+    },
     tmdb_id: 129,
     source_provider: 'tmdb',
     status: 'published',

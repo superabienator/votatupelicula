@@ -4,6 +4,8 @@ export interface MoviePalette {
   primary: string;
   secondary: string;
   accent: string;
+  i18n?: Record<string, { title?: string; synopsis?: string; genres?: string[]; tags?: string[] }>;
+  trailers?: { es?: string; va?: string; en?: string };
 }
 
 const GENRE_FALLBACK_PALETTES: Record<string, MoviePalette> = {

@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Edit3, Film, Sparkles, X } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
+import { getLocalizedMovie } from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
 import { useEscapeKey } from '../utils/useEscapeKey';
@@ -24,6 +26,7 @@ export function CinemaTicketModal({
   onBackToEdit,
   onProceedToAuth,
 }: CinemaTicketModalProps) {
+  const { lang, t } = useI18n();
   useEscapeKey(open, onBackToEdit);
   const leadPalette = rankedMovies[0]?.palette ?? {
     primary: '#6366f1',
@@ -70,13 +73,13 @@ export function CinemaTicketModal({
 
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/90">
                 <Film className="h-4 w-4" />
-                <span>Pase Oficial · Voto Borda</span>
+                <span>{t.ticketHeaderTag}</span>
               </div>
               <h2
                 id="ticket-title"
                 className="mt-1.5 font-display text-2xl font-extrabold leading-tight"
               >
-                Tu Entrada de Cine
+                {t.ticketTitle}
               </h2>
               <p className="mt-0.5 text-xs text-white/85">{campaignTitle}</p>
             </div>
@@ -85,7 +88,7 @@ export function CinemaTicketModal({
             <div className="space-y-3 px-6 py-5">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                Confirma que este es tu orden definitivo:
+                {t.ticketConfirmOrder}
               </p>
 
               <div className="space-y-2.5">
@@ -93,6 +96,7 @@ export function CinemaTicketModal({
                   const rank = idx + 1;
                   const pts = getBordaPoints(rank, topK, scoringMode);
                   const medal = getRankMedal(rank);
+                  const localized = getLocalizedMovie(movie, lang);
                   return (
                     <motion.div
                       key={movie.id}
@@ -106,7 +110,7 @@ export function CinemaTicketModal({
                       </span>
                       <div className="h-12 w-8 shrink-0 overflow-hidden rounded-md border border-white/10">
                         <MoviePoster
-                          title={movie.title}
+                          title={localized.title}
                           posterUrl={movie.poster_url}
                           palette={movie.palette}
                           compact
@@ -114,8 +118,8 @@ export function CinemaTicketModal({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-white">{movie.title}</p>
-                        <p className="text-[11px] text-slate-400">{medal.label}</p>
+                        <p className="truncate text-sm font-bold text-white">{localized.title}</p>
+                        <p className="text-[11px] text-slate-400">{t.rankOptionLabel(rank)}</p>
                       </div>
                       <span className="rounded-lg bg-amber-400/15 px-2.5 py-1 font-mono text-xs font-bold text-amber-300">
                         +{formatPointsLabel(pts)}
@@ -158,7 +162,7 @@ export function CinemaTicketModal({
                   className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-xs font-bold text-slate-200 transition hover:bg-white/10"
                 >
                   <Edit3 className="h-3.5 w-3.5" />
-                  Cambiar orden
+                  {t.ticketChangeOrder}
                 </button>
                 <button
                   type="button"
@@ -169,7 +173,7 @@ export function CinemaTicketModal({
                   }}
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  Confirmar e identificarme
+                  {t.ticketProceedAuth}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>

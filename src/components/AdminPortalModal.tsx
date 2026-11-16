@@ -20,8 +20,16 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
+import { LANGUAGE_LABELS, getMovieTrailersMap } from '../i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from '../services/api';
-import type { DashboardResults, Movie, VotingSettings } from '../types/cinema';
+import type {
+  AppLanguage,
+  DashboardResults,
+  Movie,
+  MovieLocalizedFields,
+  VotingSettings,
+} from '../types/cinema';
 import { extractPaletteFromImageCanvas } from '../utils/colorExtractor';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
@@ -40,6 +48,7 @@ export function AdminPortalModal({
   onClose,
   onPublicDataChanged,
 }: AdminPortalModalProps) {
+  const { t } = useI18n();
   const [adminSecret, setAdminSecret] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -62,12 +71,23 @@ export function AdminPortalModal({
   const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
   const [editGenresText, setEditGenresText] = useState('');
   const [editTagsText, setEditTagsText] = useState('');
+  const [editTrailerEs, setEditTrailerEs] = useState('');
+  const [editTrailerVa, setEditTrailerVa] = useState('');
+  const [editTrailerEn, setEditTrailerEn] = useState('');
+  const [editLangTab, setEditLangTab] = useState<AppLanguage>('es');
+  const [editI18n, setEditI18n] = useState<Partial<Record<AppLanguage, MovieLocalizedFields>>>({});
   const [extractingPalette, setExtractingPalette] = useState(false);
 
   function openEditModal(movie: Movie) {
+    const trailers = getMovieTrailersMap(movie);
     setEditingMovie({ ...movie });
     setEditGenresText(movie.genres.join(', '));
     setEditTagsText(movie.tags.join(', '));
+    setEditTrailerEs(trailers.es || '');
+    setEditTrailerVa(trailers.va || '');
+    setEditTrailerEn(trailers.en || '');
+    setEditLangTab('es');
+    setEditI18n(movie.translations ?? movie.palette?.i18n ?? {});
   }
 
   // Edición de settings como texto auxiliar
@@ -186,6 +206,18 @@ export function AdminPortalModal({
         .map((s) => s.trim())
         .filter(Boolean);
 
+      const nextTrailers = {
+        ...(editTrailerEs.trim() ? { es: editTrailerEs.trim() } : {}),
+        ...(editTrailerVa.trim() ? { va: editTrailerVa.trim() } : {}),
+        ...(editTrailerEn.trim() ? { en: editTrailerEn.trim() } : {}),
+      };
+
+      const nextPalette = {
+        ...editingMovie.palette,
+        i18n: editI18n,
+        trailers: nextTrailers,
+      };
+
       await cinemaApi.adminUpdateMovie(adminSecret, editingMovie.id, {
         title: editingMovie.title,
         year: editingMovie.year,
@@ -196,7 +228,7 @@ export function AdminPortalModal({
         synopsis: editingMovie.synopsis,
         poster_url: editingMovie.poster_url,
         backdrop_url: editingMovie.backdrop_url,
-        palette: editingMovie.palette,
+        palette: nextPalette,
         status: editingMovie.status,
       });
       await loadAdminData(adminSecret);
@@ -217,8 +249,11 @@ export function AdminPortalModal({
     if (!editingMovie?.poster_url) return;
     setExtractingPalette(true);
     try {
-      const palette = await extractPaletteFromImageCanvas(editingMovie.poster_url);
-      setEditingMovie({ ...editingMovie, palette });
+      const extracted = await extractPaletteFromImageCanvas(editingMovie.poster_url);
+      setEditingMovie({
+        ...editingMovie,
+        palette: { ...editingMovie.palette, ...extracted },
+      });
     } finally {
       setExtractingPalette(false);
     }
@@ -419,7 +454,7 @@ export function AdminPortalModal({
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label="Panel del Profesorado y Resultados"
+            aria-label={t.adminHeaderTitle}
             className="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#090c16] text-slate-100 shadow-2xl"
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -433,10 +468,10 @@ export function AdminPortalModal({
                 </span>
                 <div>
                   <h2 className="font-display text-lg font-extrabold text-white sm:text-xl">
-                    Panel de Control · Profesorado
+                    {t.adminHeaderTitle}
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Gestión de cartelera en 2 fases, tematización dinámica y escrutinio Borda
+                    {t.adminHeaderSub}
                   </p>
                 </div>
               </div>
@@ -447,7 +482,7 @@ export function AdminPortalModal({
                 className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
-                Volver a Cartelera Pública
+                {t.backToPublicBtn}
               </button>
             </div>
 
@@ -460,17 +495,16 @@ export function AdminPortalModal({
                 >
                   <div>
                     <h3 className="font-display text-xl font-bold text-white">
-                      Acceso protegido
+                      {t.adminLoginTitle}
                     </h3>
                     <p className="mt-1 text-xs text-slate-400">
-                      Introduce la clave de administración (`ADMIN_SECRET`) para gestionar las
-                      películas y consultar los resultados en directo.
+                      {t.adminLoginDesc}
                     </p>
                   </div>
 
                   {IS_SANDBOX_MODE && (
                     <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                      <strong>Modo Demo Local:</strong> usa la clave{' '}
+                      <strong>{t.adminDemoHint}</strong>{' '}
                       <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono font-bold text-white">
                         demo1234
                       </code>
@@ -479,7 +513,7 @@ export function AdminPortalModal({
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Clave del profesorado
+                      {t.adminKeyLabel}
                     </label>
                     <input
                       type="password"
@@ -506,10 +540,10 @@ export function AdminPortalModal({
                     {authLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Verificando…
+                        {t.verifyingAdminBtn}
                       </>
                     ) : (
-                      'Entrar al Panel'
+                      t.enterAdminBtn
                     )}
                   </button>
                 </form>
@@ -1250,6 +1284,106 @@ export function AdminPortalModal({
                     />
                   </div>
 
+                  {/* Tráilers por idioma (ES / VA / EN) */}
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5 space-y-2.5">
+                    <span className="block text-xs font-bold text-slate-200">
+                      Tráilers por idioma (YouTube o MP4)
+                    </span>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-400">
+                          Castellano (ES)
+                        </label>
+                        <input
+                          type="url"
+                          value={editTrailerEs}
+                          onChange={(e) => setEditTrailerEs(e.target.value)}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full rounded-xl border border-white/15 bg-black/45 px-2.5 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-400">
+                          Valencià (VA)
+                        </label>
+                        <input
+                          type="url"
+                          value={editTrailerVa}
+                          onChange={(e) => setEditTrailerVa(e.target.value)}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full rounded-xl border border-white/15 bg-black/45 px-2.5 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] text-slate-400">
+                          English (EN)
+                        </label>
+                        <input
+                          type="url"
+                          value={editTrailerEn}
+                          onChange={(e) => setEditTrailerEn(e.target.value)}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full rounded-xl border border-white/15 bg-black/45 px-2.5 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Traducciones opcionales por idioma (ES / VA / EN) */}
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-200">
+                        Textos por idioma (opcional)
+                      </span>
+                      <div className="flex gap-1">
+                        {(['es', 'va', 'en'] as AppLanguage[]).map((code) => (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => setEditLangTab(code)}
+                            className={`rounded-lg px-2 py-1 text-[10px] font-bold ${
+                              editLangTab === code
+                                ? 'bg-amber-300 text-slate-950'
+                                : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                            }`}
+                          >
+                            {LANGUAGE_LABELS[code].name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={editI18n[editLangTab]?.title ?? ''}
+                      onChange={(e) =>
+                        setEditI18n({
+                          ...editI18n,
+                          [editLangTab]: {
+                            ...editI18n[editLangTab],
+                            title: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder={`Título en ${LANGUAGE_LABELS[editLangTab].name} (opcional)`}
+                      className="w-full rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-xs text-white"
+                    />
+                    <textarea
+                      rows={2}
+                      value={editI18n[editLangTab]?.synopsis ?? ''}
+                      onChange={(e) =>
+                        setEditI18n({
+                          ...editI18n,
+                          [editLangTab]: {
+                            ...editI18n[editLangTab],
+                            synopsis: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder={`Sinopsis en ${LANGUAGE_LABELS[editLangTab].name} (opcional)`}
+                      className="w-full rounded-xl border border-white/15 bg-black/45 p-2.5 text-xs text-white"
+                    />
+                  </div>
+
                   {/* Paleta de color dominante con estilos rápidos */}
                   <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5">
                     <div className="flex items-center justify-between gap-2">
@@ -1277,7 +1411,10 @@ export function AdminPortalModal({
                           key={preset.name}
                           type="button"
                           onClick={() =>
-                            setEditingMovie({ ...editingMovie, palette: preset.palette })
+                            setEditingMovie({
+                              ...editingMovie,
+                              palette: { ...editingMovie.palette, ...preset.palette },
+                            })
                           }
                           className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:bg-white/15"
                         >

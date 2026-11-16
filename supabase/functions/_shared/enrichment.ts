@@ -20,6 +20,27 @@ export interface EnrichedMovieDraft {
   source_provider: 'tmdb' | 'omdb' | 'gemini' | 'manual';
 }
 
+interface TmdbVideo {
+  site?: string;
+  type?: string;
+  key?: string;
+  official?: boolean;
+}
+
+function pickYoutubeTrailer(videosPayload: { results?: TmdbVideo[] } | undefined): string {
+  const list = Array.isArray(videosPayload?.results) ? videosPayload.results : [];
+  const yt = list.filter(
+    (v) => v.site === 'YouTube' && typeof v.key === 'string' && v.key.trim() !== ''
+  );
+  if (yt.length === 0) return '';
+
+  const officialTrailer = yt.find((v) => v.type === 'Trailer' && v.official);
+  const anyTrailer = yt.find((v) => v.type === 'Trailer');
+  const teaser = yt.find((v) => v.type === 'Teaser');
+  const chosen = officialTrailer || anyTrailer || teaser || yt[0];
+  return chosen?.key ? `https://www.youtube.com/watch?v=${chosen.key}` : '';
+}
+
 function mapCertificationToEs(cert: string, country: string): string {
   const c = cert.trim().toUpperCase();
   if (!c) return 'TP';
@@ -31,7 +52,6 @@ function mapCertificationToEs(cert: string, country: string): string {
     if (c === '18' || c === '+18') return '+18';
     return c;
   }
-  // Mapeo aproximado desde clasificación estadounidense MPAA
   if (c === 'G') return 'TP';
   if (c === 'PG') return '+7';
   if (c === 'PG-13') return '+12';
@@ -40,10 +60,13 @@ function mapCertificationToEs(cert: string, country: string): string {
   return 'TP';
 }
 
-function trimSynopsisForTeens(raw: string): string {
+function trimSynopsisForTeens(raw: string, fallback = ''): string {
   const clean = (raw || '').trim().replace(/\s+/g, ' ');
   if (!clean) {
-    return 'Una historia seleccionada para debatir en clase sobre sus valores, personajes y dilemas.';
+    return (
+      fallback ||
+      'Una historia seleccionada para debatir en clase sobre sus valores, personajes y dilemas.'
+    );
   }
   if (clean.length <= 260) return clean;
   const sliced = clean.slice(0, 255);
@@ -72,32 +95,56 @@ async function fetchFromTmdb(queryTitle: string): Promise<EnrichedMovieDraft | n
   const topHit = searchData?.results?.[0];
   if (!topHit?.id) return null;
 
-  const detailUrl =
-    `https://api.themoviedb.org/3/movie/${topHit.id}?language=es-ES&append_to_response=release_dates,keywords${authQuery}`;
-  const detailRes = await fetch(detailUrl, { headers });
-  if (!detailRes.ok) return null;
+  // Consultas paralelas en Castellano (es-ES), Valencià/Català (ca-ES) e Inglés (en-US)
+  const [resEs, resCa, resEn] = await Promise.all([
+    fetch(
+      `https://api.themoviedb.org/3/movie/${topHit.id}?language=es-ES&append_to_response=release_dates,keywords,videos${authQuery}`,
+      { headers }
+    ),
+    fetch(
+      `https://api.themoviedb.org/3/movie/${topHit.id}?language=ca-ES&append_to_response=videos${authQuery}`,
+      { headers }
+    ),
+    fetch(
+      `https://api.themoviedb.org/3/movie/${topHit.id}?language=en-US&append_to_response=keywords,videos${authQuery}`,
+      { headers }
+    ),
+  ]);
 
-  const movie = await detailRes.json();
+  if (!resEs.ok) return null;
 
-  const posterUrl = movie.poster_path
-    ? `https://image.tmdb.org/t/p/w780${movie.poster_path}`
+  const movieEs = await resEs.json();
+  const movieCa = resCa.ok ? await resCa.json() : null;
+  const movieEn = resEn.ok ? await resEn.json() : null;
+
+  const posterUrl = movieEs.poster_path
+    ? `https://image.tmdb.org/t/p/w780${movieEs.poster_path}`
     : '';
-  const backdropUrl = movie.backdrop_path
-    ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
+  const backdropUrl = movieEs.backdrop_path
+    ? `https://image.tmdb.org/t/p/w1280${movieEs.backdrop_path}`
     : '';
 
-  const genres: string[] = Array.isArray(movie.genres)
-    ? movie.genres.map((g: { name: string }) => g.name).slice(0, 4)
+  const genresEs: string[] = Array.isArray(movieEs.genres)
+    ? movieEs.genres.map((g: { name: string }) => g.name).slice(0, 4)
     : [];
+  const genresCa: string[] = Array.isArray(movieCa?.genres)
+    ? movieCa.genres.map((g: { name: string }) => g.name).slice(0, 4)
+    : genresEs;
+  const genresEn: string[] = Array.isArray(movieEn?.genres)
+    ? movieEn.genres.map((g: { name: string }) => g.name).slice(0, 4)
+    : genresEs;
 
-  const rawKeywords: string[] = Array.isArray(movie.keywords?.keywords)
-    ? movie.keywords.keywords.map((k: { name: string }) => k.name).slice(0, 4)
+  const rawKeywordsEs: string[] = Array.isArray(movieEs.keywords?.keywords)
+    ? movieEs.keywords.keywords.map((k: { name: string }) => k.name).slice(0, 4)
     : [];
+  const rawKeywordsEn: string[] = Array.isArray(movieEn?.keywords?.keywords)
+    ? movieEn.keywords.keywords.map((k: { name: string }) => k.name).slice(0, 4)
+    : rawKeywordsEs;
 
   // Calificación por edades priorizando España (ES) y luego US
   let ageRating = 'TP';
-  const releaseEntries = Array.isArray(movie.release_dates?.results)
-    ? movie.release_dates.results
+  const releaseEntries = Array.isArray(movieEs.release_dates?.results)
+    ? movieEs.release_dates.results
     : [];
   const esEntry = releaseEntries.find((r: { iso_3166_1: string }) => r.iso_3166_1 === 'ES');
   const usEntry = releaseEntries.find((r: { iso_3166_1: string }) => r.iso_3166_1 === 'US');
@@ -111,30 +158,75 @@ async function fetchFromTmdb(queryTitle: string): Promise<EnrichedMovieDraft | n
     }
   }
 
-  const releaseYear = movie.release_date
-    ? Number.parseInt(String(movie.release_date).slice(0, 4), 10)
+  const releaseYear = movieEs.release_date
+    ? Number.parseInt(String(movieEs.release_date).slice(0, 4), 10)
     : null;
 
-  const palette = await extractPaletteFromPosterUrl(posterUrl, genres);
+  const basePalette = await extractPaletteFromPosterUrl(posterUrl, genresEs);
 
-  const tags =
-    rawKeywords.length > 0
-      ? rawKeywords.map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-      : genres.slice(0, 3);
+  const tagsEs =
+    rawKeywordsEs.length > 0
+      ? rawKeywordsEs.map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+      : genresEs.slice(0, 3);
+  const tagsEn =
+    rawKeywordsEn.length > 0
+      ? rawKeywordsEn.map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+      : genresEn.slice(0, 3);
+
+  const trailerEs = pickYoutubeTrailer(movieEs.videos);
+  const trailerVa = pickYoutubeTrailer(movieCa?.videos);
+  const trailerEn = pickYoutubeTrailer(movieEn?.videos);
+
+  const synopsisEs = trimSynopsisForTeens(movieEs.overview || '');
+  const synopsisCa = trimSynopsisForTeens(movieCa?.overview || '', synopsisEs);
+  const synopsisEn = trimSynopsisForTeens(
+    movieEn?.overview || '',
+    'A story selected to inspire classroom discussion on its characters, values, and dilemmas.'
+  );
+
+  const palette: MoviePalette = {
+    ...basePalette,
+    i18n: {
+      es: {
+        title: movieEs.title || queryTitle,
+        synopsis: synopsisEs,
+        genres: genresEs,
+        tags: tagsEs,
+      },
+      va: {
+        title: movieCa?.title || movieEs.title || queryTitle,
+        synopsis: synopsisCa,
+        genres: genresCa,
+        tags: tagsEs,
+      },
+      en: {
+        title: movieEn?.title || movieEs.original_title || queryTitle,
+        synopsis: synopsisEn,
+        genres: genresEn,
+        tags: tagsEn,
+      },
+    },
+    trailers: {
+      ...(trailerEs ? { es: trailerEs } : {}),
+      ...(trailerVa ? { va: trailerVa } : {}),
+      ...(trailerEn ? { en: trailerEn } : {}),
+    },
+  };
 
   return {
-    title: movie.title || queryTitle,
-    original_title: movie.original_title || null,
+    title: movieEs.title || queryTitle,
+    original_title: movieEs.original_title || null,
     year: Number.isFinite(releaseYear) ? releaseYear : null,
-    duration_minutes: typeof movie.runtime === 'number' && movie.runtime > 0 ? movie.runtime : null,
-    genres,
-    tags,
+    duration_minutes:
+      typeof movieEs.runtime === 'number' && movieEs.runtime > 0 ? movieEs.runtime : null,
+    genres: genresEs,
+    tags: tagsEs,
     age_rating: ageRating,
-    synopsis: trimSynopsisForTeens(movie.overview || ''),
+    synopsis: synopsisEs,
     poster_url: posterUrl,
     backdrop_url: backdropUrl,
     palette,
-    tmdb_id: movie.id,
+    tmdb_id: movieEs.id,
     source_provider: 'tmdb',
   };
 }
@@ -159,7 +251,8 @@ async function fetchFromOmdb(queryTitle: string): Promise<EnrichedMovieDraft | n
     .filter(Boolean)
     .slice(0, 4);
   const posterUrl = data.Poster && data.Poster !== 'N/A' ? String(data.Poster) : '';
-  const palette = await extractPaletteFromPosterUrl(posterUrl, genres);
+  const basePalette = await extractPaletteFromPosterUrl(posterUrl, genres);
+  const plotEn = trimSynopsisForTeens(data.Plot && data.Plot !== 'N/A' ? data.Plot : '');
 
   return {
     title: data.Title || queryTitle,
@@ -169,10 +262,20 @@ async function fetchFromOmdb(queryTitle: string): Promise<EnrichedMovieDraft | n
     genres,
     tags: genres.slice(0, 3),
     age_rating: mapCertificationToEs(String(data.Rated || 'PG-13'), 'US'),
-    synopsis: trimSynopsisForTeens(data.Plot && data.Plot !== 'N/A' ? data.Plot : ''),
+    synopsis: plotEn,
     poster_url: posterUrl,
     backdrop_url: '',
-    palette,
+    palette: {
+      ...basePalette,
+      i18n: {
+        en: {
+          title: data.Title || queryTitle,
+          synopsis: plotEn,
+          genres,
+          tags: genres.slice(0, 3),
+        },
+      },
+    },
     tmdb_id: null,
     source_provider: 'omdb',
   };
@@ -190,36 +293,26 @@ async function enhanceWithGemini(
   if (!geminiKey) return draft;
 
   try {
-    const prompt = hasBaseMetadata
-      ? `Eres un editor educativo de CineFórum para alumnado de ESO (12 a 16 años) en España.
+    const prompt = `Eres un editor educativo de CineFórum para alumnado de ESO (12 a 16 años).
 Dada esta película:
 - Título: ${draft.title} (${draft.year ?? 'N/D'})
 - Géneros: ${draft.genres.join(', ') || 'Cine'}
 - Sinopsis base: ${draft.synopsis}
+- Tags base: ${draft.tags.join(', ')}
 
-Devuelve EXCLUSIVAMENTE un JSON válido con:
+Devuelve EXCLUSIVAMENTE un JSON válido con textos juveniles sin spoilers (máximo 240 caracteres cada sinopsis) y 3 etiquetas temáticas traducidas a los tres idiomas (castellano "es", valencià "va" e inglés "en"):
 {
-  "synopsis": "Sinopsis atractiva, cercana y sin spoilers adaptada a público adolescente de ESO (máximo 240 caracteres, en español)",
-  "tags": ["Etiqueta 1", "Etiqueta 2", "Etiqueta 3"],
-  "palette": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "accent": "#RRGGBB" }
-}
-Los colores deben combinar con la atmósfera visual de la película y destacar bien sobre fondo oscuro (#09090f).`
-      : `Eres un editor educativo de CineFórum para alumnado de ESO (12 a 16 años).
-Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON válido en español con su ficha real aproximada:
-{
-  "title": "Título oficial en español",
-  "year": 2014,
-  "duration_minutes": 120,
-  "genres": ["Género 1", "Género 2"],
-  "age_rating": "+12",
-  "synopsis": "Sinopsis juvenil sin spoilers (máx 240 caracteres)",
-  "tags": ["Etiqueta temática 1", "Etiqueta 2", "Etiqueta 3"],
-  "palette": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "accent": "#RRGGBB" }
+  ${hasBaseMetadata ? '' : '"title": "Título oficial",\n  "year": 2014,\n  "duration_minutes": 120,\n  "age_rating": "+12",'}
+  "palette": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "accent": "#RRGGBB" },
+  "i18n": {
+    "es": { "title": "Título en castellano", "synopsis": "Sinopsis en castellano", "genres": ["Género"], "tags": ["Tag 1", "Tag 2", "Tag 3"] },
+    "va": { "title": "Títol en valencià", "synopsis": "Sinopsi en valencià", "genres": ["Gènere"], "tags": ["Etiqueta 1", "Etiqueta 2", "Etiqueta 3"] },
+    "en": { "title": "Title in English", "synopsis": "Synopsis in English", "genres": ["Genre"], "tags": ["Tag 1", "Tag 2", "Tag 3"] }
+  }
 }`;
 
     const parts: Array<Record<string, unknown>> = [{ text: prompt }];
 
-    // Si hay póster JPEG de TMDB, lo adjuntamos en modo multimodal (w185 ligero)
     if (draft.poster_url) {
       try {
         const smallPoster = draft.poster_url.replace('/t/p/w780/', '/t/p/w185/');
@@ -238,7 +331,7 @@ Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON vá
           });
         }
       } catch {
-        // Continuamos solo con texto si falla la descarga de imagen
+        // Continuamos solo con texto si falla la descarga
       }
     }
 
@@ -252,7 +345,7 @@ Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON vá
         contents: [{ parts }],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.4,
+          temperature: 0.35,
         },
       }),
     });
@@ -263,6 +356,81 @@ Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON vá
     if (!rawText) return draft;
 
     const parsed = JSON.parse(rawText);
+    const esNode = parsed?.i18n?.es;
+    const vaNode = parsed?.i18n?.va;
+    const enNode = parsed?.i18n?.en;
+
+    const mergedI18n = {
+      ...(draft.palette.i18n ?? {}),
+      ...(esNode
+        ? {
+            es: {
+              title: typeof esNode.title === 'string' ? esNode.title : draft.title,
+              synopsis:
+                typeof esNode.synopsis === 'string'
+                  ? trimSynopsisForTeens(esNode.synopsis)
+                  : draft.synopsis,
+              genres: Array.isArray(esNode.genres)
+                ? esNode.genres.slice(0, 4).map(String)
+                : draft.genres,
+              tags: Array.isArray(esNode.tags)
+                ? esNode.tags.slice(0, 4).map(String)
+                : draft.tags,
+            },
+          }
+        : {}),
+      ...(vaNode
+        ? {
+            va: {
+              title: typeof vaNode.title === 'string' ? vaNode.title : draft.title,
+              synopsis:
+                typeof vaNode.synopsis === 'string'
+                  ? trimSynopsisForTeens(vaNode.synopsis)
+                  : draft.synopsis,
+              genres: Array.isArray(vaNode.genres)
+                ? vaNode.genres.slice(0, 4).map(String)
+                : draft.genres,
+              tags: Array.isArray(vaNode.tags)
+                ? vaNode.tags.slice(0, 4).map(String)
+                : draft.tags,
+            },
+          }
+        : {}),
+      ...(enNode
+        ? {
+            en: {
+              title: typeof enNode.title === 'string' ? enNode.title : draft.title,
+              synopsis:
+                typeof enNode.synopsis === 'string'
+                  ? trimSynopsisForTeens(enNode.synopsis)
+                  : draft.synopsis,
+              genres: Array.isArray(enNode.genres)
+                ? enNode.genres.slice(0, 4).map(String)
+                : draft.genres,
+              tags: Array.isArray(enNode.tags)
+                ? enNode.tags.slice(0, 4).map(String)
+                : draft.tags,
+            },
+          }
+        : {}),
+    };
+
+    const nextPalette: MoviePalette = {
+      primary:
+        parsed.palette && isValidHex(parsed.palette.primary)
+          ? parsed.palette.primary
+          : draft.palette.primary,
+      secondary:
+        parsed.palette && isValidHex(parsed.palette.secondary)
+          ? parsed.palette.secondary
+          : draft.palette.secondary,
+      accent:
+        parsed.palette && isValidHex(parsed.palette.accent)
+          ? parsed.palette.accent
+          : draft.palette.accent,
+      i18n: mergedI18n,
+      trailers: draft.palette.trailers,
+    };
 
     return {
       ...draft,
@@ -272,29 +440,14 @@ Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON vá
         !hasBaseMetadata && typeof parsed.duration_minutes === 'number'
           ? parsed.duration_minutes
           : draft.duration_minutes,
-      genres:
-        !hasBaseMetadata && Array.isArray(parsed.genres)
-          ? parsed.genres.slice(0, 4).map(String)
-          : draft.genres,
+      genres: mergedI18n.es?.genres ?? draft.genres,
       age_rating:
         !hasBaseMetadata && typeof parsed.age_rating === 'string'
           ? parsed.age_rating
           : draft.age_rating,
-      synopsis:
-        typeof parsed.synopsis === 'string' && parsed.synopsis.trim()
-          ? trimSynopsisForTeens(parsed.synopsis)
-          : draft.synopsis,
-      tags:
-        Array.isArray(parsed.tags) && parsed.tags.length > 0
-          ? parsed.tags.slice(0, 4).map((t: unknown) => String(t).trim()).filter(Boolean)
-          : draft.tags,
-      palette:
-        parsed.palette &&
-        isValidHex(parsed.palette.primary) &&
-        isValidHex(parsed.palette.secondary) &&
-        isValidHex(parsed.palette.accent)
-          ? parsed.palette
-          : draft.palette,
+      synopsis: mergedI18n.es?.synopsis ?? draft.synopsis,
+      tags: mergedI18n.es?.tags ?? draft.tags,
+      palette: nextPalette,
       source_provider: hasBaseMetadata ? draft.source_provider : 'gemini',
     };
   } catch {
@@ -305,7 +458,6 @@ Para la película titulada "${draft.title}", devuelve EXCLUSIVAMENTE un JSON vá
 export async function enrichMovieTitle(rawTitle: string): Promise<EnrichedMovieDraft> {
   const queryTitle = rawTitle.trim();
 
-  // 1. Intentar TMDB -> OMDb
   let baseDraft = await fetchFromTmdb(queryTitle);
   if (!baseDraft) {
     baseDraft = await fetchFromOmdb(queryTitle);
@@ -332,6 +484,5 @@ export async function enrichMovieTitle(rawTitle: string): Promise<EnrichedMovieD
     };
   }
 
-  // 2. Enriquecer con Gemini (sinopsis juvenil + etiquetas + paleta multimodal) si hay API key
   return await enhanceWithGemini(baseDraft, hasBaseMetadata);
 }

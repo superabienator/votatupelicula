@@ -1,5 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Clock, Film, ShieldCheck, X } from 'lucide-react';
+import { Clock, ExternalLink, Film, PlayCircle, ShieldCheck, X } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
+import {
+  LANGUAGE_LABELS,
+  getLocalizedMovie,
+  resolveMovieTrailer,
+} from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatDuration, getBordaPoints } from '../utils/borda';
 import { hexToRgba } from '../utils/colorExtractor';
@@ -12,6 +18,7 @@ interface MovieDetailModalProps {
   scoringMode: ScoringMode;
   assignedRank: number | null;
   onAssignRank: (movieId: string, rank: number) => void;
+  onWatchTrailer: (movie: Movie) => void;
   onClose: () => void;
 }
 
@@ -21,9 +28,14 @@ export function MovieDetailModal({
   scoringMode,
   assignedRank,
   onAssignRank,
+  onWatchTrailer,
   onClose,
 }: MovieDetailModalProps) {
+  const { lang, t } = useI18n();
   useEscapeKey(Boolean(movie), onClose);
+
+  const localized = movie ? getLocalizedMovie(movie, lang) : null;
+  const trailer = movie ? resolveMovieTrailer(movie, lang) : null;
   return (
     <AnimatePresence>
       {movie && (
@@ -75,7 +87,7 @@ export function MovieDetailModal({
               <div className="flex flex-col gap-5 sm:flex-row">
                 <div className="h-48 w-32 shrink-0 overflow-hidden rounded-2xl border border-white/20 shadow-2xl">
                   <MoviePoster
-                    title={movie.title}
+                    title={localized?.title || movie.title}
                     year={movie.year}
                     posterUrl={movie.poster_url}
                     palette={movie.palette}
@@ -85,13 +97,14 @@ export function MovieDetailModal({
 
                 <div className="pt-2 sm:pt-14">
                   <h2 className="font-display text-2xl font-extrabold text-white">
-                    {movie.title}
+                    {localized?.title || movie.title}
                   </h2>
-                  {movie.original_title && movie.original_title !== movie.title && (
-                    <p className="text-xs italic text-slate-400">
-                      Título original: {movie.original_title}
-                    </p>
-                  )}
+                  {movie.original_title &&
+                    movie.original_title !== (localized?.title || movie.title) && (
+                      <p className="text-xs italic text-slate-400">
+                        {t.originalTitleLabel} {movie.original_title}
+                      </p>
+                    )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                     {movie.year && (
@@ -117,15 +130,15 @@ export function MovieDetailModal({
               <div className="mt-5 space-y-4">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Sinopsis para CineFórum
+                    {t.synopsisTitle}
                   </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-slate-200">
-                    {movie.synopsis}
+                    {localized?.synopsis || movie.synopsis}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {movie.genres.map((g) => (
+                  {(localized?.genres || movie.genres).map((g) => (
                     <span
                       key={g}
                       className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200"
@@ -133,7 +146,7 @@ export function MovieDetailModal({
                       {g}
                     </span>
                   ))}
-                  {movie.tags.map((tag) => (
+                  {(localized?.tags || movie.tags).map((tag) => (
                     <span
                       key={tag}
                       className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
@@ -147,10 +160,37 @@ export function MovieDetailModal({
                   ))}
                 </div>
 
+                {/* Tráiler integrado y enlace externo */}
+                {trailer?.url && trailer.activeLang && (
+                  <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-3.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = movie;
+                        onClose();
+                        onWatchTrailer(target);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2 text-xs font-extrabold text-slate-950 shadow transition hover:bg-amber-200"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      {t.watchTrailer} ({LANGUAGE_LABELS[trailer.activeLang].name})
+                    </button>
+                    <a
+                      href={trailer.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 text-sky-300" />
+                      {t.openTrailerExternal}
+                    </a>
+                  </div>
+                )}
+
                 {/* Botonera rápida de voto */}
                 <div className="rounded-2xl border border-white/10 bg-black/35 p-4">
                   <p className="mb-2.5 text-xs font-semibold text-slate-300">
-                    Asignar posición en tu TOP {topK}:
+                    {t.assignPositionTitle(topK)}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {Array.from({ length: topK }, (_, i) => i + 1).map((rank) => {
@@ -177,7 +217,8 @@ export function MovieDetailModal({
                               : undefined
                           }
                         >
-                          {rank}ª opción ({getBordaPoints(rank, topK, scoringMode)} pts)
+                          {t.rankOptionLabel(rank)} ({getBordaPoints(rank, topK, scoringMode)}{' '}
+                          {t.ptPlural})
                         </button>
                       );
                     })}

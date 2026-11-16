@@ -12,6 +12,8 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
+import { getLocalizedMovie } from '../i18n/translations';
 import { cinemaApi } from '../services/api';
 import type {
   Movie,
@@ -40,6 +42,7 @@ export function VoterAuthModal({
   onClose,
   onVoteCompleted,
 }: VoterAuthModalProps) {
+  const { lang, t } = useI18n();
   const [step, setStep] = useState<Step>('identity');
   const [form, setForm] = useState<VoterIdentityForm>({
     nombre: '',
@@ -223,27 +226,25 @@ export function VoterAuthModal({
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Control antifraude · 1 alumno = 1 voto
+                    {t.authAntiFraudBadge}
                   </span>
                   <h2
                     id="auth-modal-title"
                     className="mt-2 font-display text-2xl font-extrabold text-white"
                   >
-                    Identifícate para validar tu voto
+                    {t.authTitle}
                   </h2>
                   <p className="mt-1 text-xs leading-relaxed text-slate-300">
-                    Te enviaremos un código de 4 dígitos al correo.{' '}
-                    <strong className="text-sky-300">
-                      No guardamos cookies ni bloqueamos el navegador
-                    </strong>
-                    : otro compañero podrá votar después en este mismo dispositivo.
+                    {t.authNoticeBefore}
+                    <strong className="text-sky-300">{t.authNoticeBold}</strong>
+                    {t.authNoticeAfter}
                   </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Nombre *
+                      {t.fieldNombre}
                     </label>
                     <input
                       type="text"
@@ -252,13 +253,13 @@ export function VoterAuthModal({
                       enterKeyHint="next"
                       value={form.nombre}
                       onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                      placeholder="Ej. Lucía"
+                      placeholder={t.fieldNombrePh}
                       className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Apellidos *
+                      {t.fieldApellidos}
                     </label>
                     <input
                       type="text"
@@ -267,7 +268,7 @@ export function VoterAuthModal({
                       enterKeyHint="next"
                       value={form.apellidos}
                       onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
-                      placeholder="Ej. García López"
+                      placeholder={t.fieldApellidosPh}
                       className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                     />
                   </div>
@@ -275,7 +276,7 @@ export function VoterAuthModal({
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-300">
-                    Curso / Grupo *
+                    {t.fieldCurso}
                   </label>
                   <select
                     required
@@ -293,7 +294,7 @@ export function VoterAuthModal({
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-300">
-                    Correo electrónico *
+                    {t.fieldEmail}
                   </label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -314,8 +315,7 @@ export function VoterAuthModal({
                   </div>
                   {settings.allowed_email_domains.length > 0 && (
                     <p className="mt-1 text-[11px] text-sky-300">
-                      Dominios admitidos por el centro:{' '}
-                      {settings.allowed_email_domains.join(', ')}
+                      {t.allowedDomainsHint(settings.allowed_email_domains)}
                     </p>
                   )}
                 </div>
@@ -343,12 +343,12 @@ export function VoterAuthModal({
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Enviando código de 4 dígitos…
+                      {t.sendingOtpBtn}
                     </>
                   ) : (
                     <>
                       <KeyRound className="h-4 w-4" />
-                      Enviar código de verificación
+                      {t.sendOtpBtn}
                     </>
                   )}
                 </button>
@@ -361,21 +361,16 @@ export function VoterAuthModal({
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-300">
                     <Mail className="h-3.5 w-3.5" />
-                    Revisa tu bandeja de entrada
+                    {t.otpInboxBadge}
                   </span>
                   <h2
                     id="auth-modal-title"
                     className="mt-2 font-display text-2xl font-extrabold text-white"
                   >
-                    Introduce tu código de 4 cifras
+                    {t.otpTitle}
                   </h2>
                   <p className="mt-1 text-xs text-slate-300">
-                    Hemos enviado el código a{' '}
-                    <strong className="text-white">{challenge.email}</strong>. Caduca en{' '}
-                    <span className="font-mono font-bold text-amber-300">
-                      {mm}:{ss}
-                    </span>{' '}
-                    (máximo 3 intentos).
+                    {t.otpSubtitle(challenge.email, `${mm}:${ss}`)}
                   </p>
                 </div>
 
@@ -384,10 +379,10 @@ export function VoterAuthModal({
                   <div className="rounded-2xl border border-amber-400/35 bg-amber-400/10 p-3 text-xs text-amber-200">
                     <div className="flex items-center gap-2 font-bold text-amber-300">
                       <Sparkles className="h-4 w-4" />
-                      Bandeja simulada (Modo Demo / Dev)
+                      {t.otpDemoTitle}
                     </div>
                     <p className="mt-1">
-                      Tu código de verificación generado es:{' '}
+                      {t.otpDemoBody}{' '}
                       <span className="ml-1 rounded bg-black/40 px-2 py-0.5 font-mono text-base font-extrabold tracking-widest text-white">
                         {challenge.dev_otp_preview}
                       </span>
@@ -407,7 +402,7 @@ export function VoterAuthModal({
                       inputMode="numeric"
                       autoComplete="one-time-code"
                       maxLength={4}
-                      aria-label={`Dígito ${idx + 1} del código`}
+                      aria-label={`Dígito ${idx + 1}`}
                       value={digit}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
@@ -439,12 +434,12 @@ export function VoterAuthModal({
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Verificando código…
+                      {t.verifyingOtpBtn}
                     </>
                   ) : (
                     <>
                       <UserCheck className="h-4 w-4" />
-                      Validar y registrar voto
+                      {t.verifyOtpBtn}
                     </>
                   )}
                 </button>
@@ -455,7 +450,7 @@ export function VoterAuthModal({
                     onClick={() => setStep('identity')}
                     className="underline-offset-2 hover:text-white hover:underline"
                   >
-                    ← Cambiar datos
+                    {t.changeDataBtn}
                   </button>
 
                   <button
@@ -466,8 +461,8 @@ export function VoterAuthModal({
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     {cooldownSecondsLeft > 0
-                      ? `Reenviar en ${cooldownSecondsLeft}s`
-                      : 'Reenviar nuevo código'}
+                      ? t.resendInBtn(cooldownSecondsLeft)
+                      : t.resendBtn}
                   </button>
                 </div>
               </form>
@@ -490,27 +485,27 @@ export function VoterAuthModal({
                     id="auth-modal-title"
                     className="font-display text-2xl font-extrabold text-white"
                   >
-                    ¡Voto registrado con éxito!
+                    {t.voteSuccessTitle}
                   </h2>
                   <p className="mt-1 text-xs text-slate-300">
-                    Tu voto preferencial de <strong>{receipt.curso}</strong> ya forma parte del
-                    escrutinio.
+                    {t.voteSuccessSubtitle(receipt.curso)}
                   </p>
                   <p className="mt-2 inline-block rounded-lg bg-black/40 px-3 py-1 font-mono text-[11px] text-slate-400">
-                    Recibo #{receipt.vote_id.slice(0, 8).toUpperCase()}
+                    {t.receiptPrefix}
+                    {receipt.vote_id.slice(0, 8).toUpperCase()}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left">
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Tu orden guardado
+                    {t.savedOrderTitle}
                   </p>
                   <ol className="space-y-1.5 text-sm">
                     {receipt.rankedMovies.map((m, idx) => (
                       <li key={m.id} className="flex items-center justify-between">
                         <span className="text-slate-100">
                           <strong className="mr-2 font-mono text-amber-300">{idx + 1}º</strong>
-                          {m.title}
+                          {getLocalizedMovie(m, lang).title}
                         </span>
                       </li>
                     ))}
@@ -522,7 +517,7 @@ export function VoterAuthModal({
                   onClick={onClose}
                   className="w-full rounded-2xl bg-white px-5 py-3.5 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-slate-200"
                 >
-                  Listo · Dejar votar al siguiente compañero/a
+                  {t.nextVoterBtn}
                 </button>
               </div>
             )}

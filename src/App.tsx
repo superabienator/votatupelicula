@@ -4,8 +4,8 @@ import {
   Clapperboard,
   Film,
   HelpCircle,
+  Languages,
   Popcorn,
-  Search,
   Sparkles,
   Ticket,
 } from 'lucide-react';
@@ -17,9 +17,12 @@ import { CivicEducationModal } from './components/CivicEducationModal';
 import { MovieCard } from './components/MovieCard';
 import { MovieDetailModal } from './components/MovieDetailModal';
 import { RankingDock } from './components/RankingDock';
+import { TrailerPlayerModal } from './components/TrailerPlayerModal';
 import { VoterAuthModal } from './components/VoterAuthModal';
+import { useI18n } from './i18n/I18nContext';
+import { LANGUAGE_LABELS } from './i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from './services/api';
-import type { Movie, MoviePalette, VotingSettings } from './types/cinema';
+import type { AppLanguage, Movie, MoviePalette, VotingSettings } from './types/cinema';
 import { getScoringWeightsList } from './utils/borda';
 import { DEFAULT_PALETTE, blendPalettes, hexToRgba } from './utils/colorExtractor';
 import { assignMovieRank, moveMovieByStep } from './utils/ranking';
@@ -31,6 +34,7 @@ function isAdminUrl(): boolean {
 }
 
 export function App() {
+  const { lang, setLang, t } = useI18n();
   const [settings, setSettings] = useState<VotingSettings | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,12 +42,11 @@ export function App() {
 
   // Estado de votación en memoria (sin cookies / localStorage / sessionStorage)
   const [rankedMovies, setRankedMovies] = useState<Movie[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState<string>('Todas');
 
   // Estado visual dinámico
   const [hoveredMovie, setHoveredMovie] = useState<Movie | null>(null);
   const [inspectedMovie, setInspectedMovie] = useState<Movie | null>(null);
+  const [trailerMovie, setTrailerMovie] = useState<Movie | null>(null);
 
   // Modales
   const [civicModalOpen, setCivicModalOpen] = useState(false);
@@ -112,26 +115,6 @@ export function App() {
     root.style.setProperty('--theme-secondary', activePalette.secondary);
     root.style.setProperty('--theme-accent', activePalette.accent);
   }, [activePalette]);
-
-  const allGenres = useMemo(() => {
-    const set = new Set<string>(['Todas']);
-    movies.forEach((m) => m.genres.forEach((g) => set.add(g)));
-    return Array.from(set);
-  }, [movies]);
-
-  const filteredMovies = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return movies.filter((m) => {
-      const matchesGenre =
-        selectedGenre === 'Todas' || m.genres.includes(selectedGenre);
-      const matchesQuery =
-        !q ||
-        m.title.toLowerCase().includes(q) ||
-        m.synopsis.toLowerCase().includes(q) ||
-        m.tags.some((t) => t.toLowerCase().includes(q));
-      return matchesGenre && matchesQuery;
-    });
-  }, [movies, searchQuery, selectedGenre]);
 
   const topK = settings?.top_k ?? 3;
   const scoringMode = settings?.scoring_mode ?? 'classic';
@@ -204,17 +187,42 @@ export function App() {
                 </span>
                 {IS_SANDBOX_MODE && (
                   <span className="hidden rounded-full border border-amber-300/45 bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-200 sm:inline-block">
-                    Modo Demo Local
+                    {t.demoBadge}
                   </span>
                 )}
               </div>
               <p className="hidden text-[11px] text-sky-200/80 sm:block">
-                🎬 CineFórum Democrático · Educación Secundaria (ESO)
+                {t.brandSubtitle}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Selector de idioma: Castellano, Valencià, English */}
+            <div
+              role="group"
+              aria-label="Language selector"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/10 p-1"
+            >
+              <Languages className="ml-1.5 hidden h-3.5 w-3.5 text-amber-200 sm:block" />
+              {(['es', 'va', 'en'] as AppLanguage[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  aria-pressed={lang === code}
+                  title={LANGUAGE_LABELS[code].name}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-extrabold transition ${
+                    lang === code
+                      ? 'bg-amber-300 text-slate-950 shadow-sm'
+                      : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {LANGUAGE_LABELS[code].code}
+                </button>
+              ))}
+            </div>
+
             {/* Botón didáctico obligatorio accesible en todo momento */}
             <button
               type="button"
@@ -222,7 +230,7 @@ export function App() {
               className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300/45 bg-sky-400/20 px-3 py-2 text-xs font-bold text-sky-100 shadow-sm transition hover:bg-sky-400/30"
             >
               <HelpCircle className="h-4 w-4 text-sky-200" />
-              <span>¿Cómo funciona tu voto?</span>
+              <span>{t.howItWorksBtn}</span>
             </button>
           </div>
         </div>
@@ -246,25 +254,24 @@ export function App() {
                     }}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Voto Preferencial · Recuento Borda
+                    {t.heroBadge}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full border border-rose-300/35 bg-rose-400/15 px-3 py-1 text-xs font-bold text-rose-200">
                     <Popcorn className="h-3.5 w-3.5" />
-                    ¡Elige tu TOP {topK}!
+                    {t.heroTopBadge(topK)}
                   </span>
                   {settings && !settings.voting_open && (
                     <span className="rounded-full border border-rose-500/45 bg-rose-500/20 px-3 py-1 text-xs font-bold text-rose-200">
-                      Urna cerrada
+                      {t.votingClosedBadge}
                     </span>
                   )}
                 </div>
 
                 <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                  {settings?.campaign_title || 'CineFórum ESO · Votación de Cartelera'}
+                  {settings?.campaign_title || t.defaultCampaignTitle}
                 </h1>
                 <p className="mt-2 text-sm leading-relaxed text-slate-200 sm:text-base">
-                  {settings?.subtitle ||
-                    'Elige y ordena tus películas favoritas. Todas tus preferencias suman puntos.'}
+                  {settings?.subtitle || t.defaultCampaignSubtitle}
                 </p>
               </div>
 
@@ -272,7 +279,7 @@ export function App() {
               <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-black/25 p-3.5 backdrop-blur-sm">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-200">
                   <Film className="h-3.5 w-3.5" />
-                  Valor de tu TOP {topK}
+                  {t.topValueLabel(topK)}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {weights.map((w) => (
@@ -280,45 +287,12 @@ export function App() {
                       key={w.rank}
                       className="rounded-xl border border-amber-300/30 bg-amber-400/15 px-2.5 py-1 font-mono text-xs font-bold text-amber-200"
                     >
-                      {w.rank}º = {w.points} {w.points === 1 ? 'pt' : 'pts'}
+                      {w.rank}º = {w.points} {w.points === 1 ? t.ptSingular : t.ptPlural}
                     </span>
                   ))}
                 </div>
               </div>
             </div>
-
-            {/* Barra de filtro rápido */}
-            {movies.length > 0 && (
-              <div className="mt-6 flex flex-col gap-3 border-t border-white/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative w-full sm:max-w-xs">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-sky-200/70" />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar título, género o tema…"
-                    className="w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-300 focus:border-amber-300 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {allGenres.map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => setSelectedGenre(genre)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                        selectedGenre === genre
-                          ? 'bg-amber-300 text-slate-950 shadow'
-                          : 'border border-white/15 bg-white/10 text-slate-100 hover:bg-white/20'
-                      }`}
-                    >
-                      {genre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <FilmStripDivider />
@@ -338,13 +312,15 @@ export function App() {
 
         {!loading && loadError && (
           <div className="rounded-3xl border border-rose-500/35 bg-rose-950/20 p-8 text-center">
-            <p className="text-sm font-semibold text-rose-200">{loadError}</p>
+            <p className="text-sm font-semibold text-rose-200">
+              {loadError || t.loadErrorFallback}
+            </p>
             <button
               type="button"
               onClick={fetchBallot}
               className="mt-4 rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-950"
             >
-              Reintentar
+              {t.retryBtn}
             </button>
           </div>
         )}
@@ -353,15 +329,13 @@ export function App() {
         {!loading && !loadError && (
           <div className="grid items-start gap-7 lg:grid-cols-[1fr_360px]">
             <div>
-              {filteredMovies.length === 0 ? (
+              {movies.length === 0 ? (
                 <div className="rounded-3xl border border-white/15 bg-white/[0.04] p-10 text-center text-sm text-slate-300">
-                  {movies.length === 0
-                    ? 'Aún no hay películas publicadas en la cartelera.'
-                    : 'No hay películas que coincidan con tu búsqueda.'}
+                  {t.emptyPublished}
                 </div>
               ) : (
                 <div className="grid gap-4 xl:grid-cols-2">
-                  {filteredMovies.map((movie, movieIdx) => {
+                  {movies.map((movie, movieIdx) => {
                     const idx = rankedMovies.findIndex((m) => m.id === movie.id);
                     return (
                       <MovieCard
@@ -372,6 +346,7 @@ export function App() {
                         assignedRank={idx === -1 ? null : idx + 1}
                         onAssignRank={handleAssignRank}
                         onInspectMovie={setInspectedMovie}
+                        onWatchTrailer={setTrailerMovie}
                         onHoverMovie={setHoveredMovie}
                         disabled={!settings?.voting_open}
                         priority={movieIdx < 4}
@@ -406,12 +381,12 @@ export function App() {
           <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
             <div>
               <p className="font-display text-xs font-bold text-white">
-                Tu TOP {topK}: {rankedMovies.length} / {topK} elegidas
+                {t.mobileTopStatus(topK, rankedMovies.length)}
               </p>
               <p className="text-[11px] text-slate-400">
                 {rankedMovies.length === topK
-                  ? '¡Lista completa! Revisa tu entrada.'
-                  : 'Toca 1º, 2º, 3º en cada película.'}
+                  ? t.mobileTopReady
+                  : t.mobileTopHint}
               </p>
             </div>
             {rankedMovies.length === topK && settings?.voting_open ? (
@@ -424,7 +399,7 @@ export function App() {
                 }}
               >
                 <Ticket className="h-4 w-4" />
-                Votar ahora
+                {t.voteNowBtn}
               </button>
             ) : (
               <button
@@ -435,7 +410,7 @@ export function App() {
                 className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white"
               >
                 <ChevronUp className="h-4 w-4" />
-                Ver mi TOP
+                {t.seeMyTopBtn}
               </button>
             )}
           </div>
@@ -463,7 +438,13 @@ export function App() {
             : null
         }
         onAssignRank={handleAssignRank}
+        onWatchTrailer={setTrailerMovie}
         onClose={() => setInspectedMovie(null)}
+      />
+
+      <TrailerPlayerModal
+        movie={trailerMovie}
+        onClose={() => setTrailerMovie(null)}
       />
 
       <CinemaTicketModal
