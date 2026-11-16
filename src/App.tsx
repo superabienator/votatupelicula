@@ -315,7 +315,7 @@ export function App() {
           <FilmStripDivider />
 
           <div className="p-5 sm:p-7">
-            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
               <div className="max-w-2xl">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -346,6 +346,19 @@ export function App() {
                 <p className="mt-2 text-sm leading-relaxed text-slate-200 sm:text-base">
                   {localizeCampaignSubtitle(settings?.subtitle, lang)}
                 </p>
+              </div>
+
+              {/* Cuño circular estilo sello "approved" */}
+              <div className="flex shrink-0 items-center justify-center lg:mx-auto">
+                <div className="relative -rotate-12 select-none rounded-full p-1 ring-2 ring-amber-300/30 transition-transform duration-300 motion-safe:hover:-rotate-6 motion-safe:hover:scale-105">
+                  <img
+                    src="/vota-stamp.png"
+                    alt="¡Vota! Tu voto cuenta · Hazte escuchar que se note"
+                    width={144}
+                    height={144}
+                    className="h-24 w-24 rounded-full object-contain drop-shadow-[0_12px_28px_rgba(245,158,11,0.38)] sm:h-28 sm:w-28 lg:h-36 lg:w-36"
+                  />
+                </div>
               </div>
 
               {/* Leyenda de puntuación Borda vigente */}
