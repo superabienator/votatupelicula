@@ -36,9 +36,11 @@ CREATE POLICY "Public read voting settings"
 -- 2. Cálculo determinista de puntuación Borda ponderada
 -- ----------------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.get_borda_points(SMALLINT, SMALLINT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.get_borda_points(
-  p_rank SMALLINT,
-  p_top_k SMALLINT,
+  p_rank INTEGER,
+  p_top_k INTEGER,
   p_scoring_mode TEXT
 )
 RETURNS NUMERIC(6,2)
@@ -207,7 +209,7 @@ BEGIN
   -- 5. Inserción de preferencias ordenadas con puntuación Borda
   FOR v_idx IN 1..cardinality(v_token.pending_movie_ids) LOOP
     v_movie_id := v_token.pending_movie_ids[v_idx];
-    v_points := public.get_borda_points(v_idx, v_settings.top_k, v_settings.scoring_mode);
+    v_points := public.get_borda_points(v_idx::INTEGER, v_settings.top_k::INTEGER, v_settings.scoring_mode);
 
     INSERT INTO public.vote_choices (vote_id, movie_id, rank_position, points)
     VALUES (v_vote_id, v_movie_id, v_idx, v_points);
