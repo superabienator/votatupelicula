@@ -1,6 +1,8 @@
 import { Film } from 'lucide-react';
 import { useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import type { MoviePalette } from '../types/cinema';
+import { sanitizeSafeHttpUrl } from '../utils/urlSafety';
 
 interface MoviePosterProps {
   title: string;
@@ -21,9 +23,12 @@ export function MoviePoster({
   compact = false,
   priority = false,
 }: MoviePosterProps) {
-  const [failed, setFailed] = useState(false);
+  const { t } = useI18n();
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const safePosterUrl = sanitizeSafeHttpUrl(posterUrl);
+  const failed = !safePosterUrl || failedUrl === safePosterUrl;
 
-  if (!posterUrl || failed) {
+  if (failed) {
     return (
       <div
         className={`relative flex flex-col justify-between overflow-hidden p-3 text-white ${className}`}
@@ -32,15 +37,19 @@ export function MoviePoster({
         }}
       >
         <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-slate-950/90 via-slate-950/45 to-transparent"
+          aria-hidden="true"
+        />
+        <div
           className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-35 blur-2xl"
           style={{ backgroundColor: palette.accent }}
         />
         <div className="relative flex items-center justify-between">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/35 backdrop-blur-sm">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/45 backdrop-blur-sm">
             <Film className="h-4 w-4 text-white/90" />
           </span>
           {year && (
-            <span className="rounded-md bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-white/80">
+            <span className="rounded-md bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-white/90">
               {year}
             </span>
           )}
@@ -60,13 +69,13 @@ export function MoviePoster({
 
   return (
     <img
-      src={posterUrl}
-      alt={`Póster de ${title}`}
+      src={safePosterUrl}
+      alt={t.posterAlt(title)}
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"
-      onError={() => setFailed(true)}
-      className={`object-cover ${className}`}
+      onError={() => setFailedUrl(safePosterUrl)}
+      className={`bg-slate-900/60 object-cover ${className}`}
     />
   );
 }

@@ -34,8 +34,8 @@ export function formatPointsLabel(points: number): string {
   return `${formatted} ${points === 1 ? 'pt' : 'pts'}`;
 }
 
-export function formatDuration(minutes: number | null): string {
-  if (!minutes || minutes <= 0) return 'N/D';
+export function formatDuration(minutes: number | null, emptyLabel = 'N/D'): string {
+  if (!minutes || minutes <= 0) return emptyLabel;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m} min`;

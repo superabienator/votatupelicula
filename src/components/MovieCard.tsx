@@ -8,7 +8,7 @@ import {
 } from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatDuration, formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
-import { hexToRgba } from '../utils/colorExtractor';
+import { getReadableTextColor, hexToRgba } from '../utils/colorExtractor';
 import { MoviePoster } from './MoviePoster';
 
 interface MovieCardProps {
@@ -50,7 +50,7 @@ export function MovieCard({
       transition={{ duration: 0.25 }}
       onMouseEnter={() => onHoverMovie?.(movie)}
       onMouseLeave={() => onHoverMovie?.(null)}
-      className="group relative flex flex-col overflow-hidden rounded-3xl border bg-[#1b2242]/88 backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5"
+      className="group relative flex flex-col overflow-hidden rounded-3xl border bg-[#1b2242]/88 backdrop-blur-md transition-all duration-300 motion-safe:hover:-translate-y-0.5"
       style={{
         borderColor: assignedRank
           ? hexToRgba(movie.palette.primary, 0.85)
@@ -68,13 +68,13 @@ export function MovieCard({
         }}
       />
 
-      <div className="flex flex-1 gap-4 p-4">
+      <div className="flex flex-1 gap-3 p-3.5 sm:gap-4 sm:p-4">
         {/* Póster */}
         <button
           type="button"
           onClick={() => onInspectMovie(movie)}
           aria-label={t.inspectMovieAria(localized.title)}
-          className="relative h-44 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-lg transition duration-300 group-hover:scale-[1.02] sm:h-48 sm:w-32"
+          className="relative h-36 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-lg transition duration-300 motion-safe:group-hover:scale-[1.02] sm:h-48 sm:w-32"
         >
           <MoviePoster
             title={localized.title}
@@ -84,17 +84,17 @@ export function MovieCard({
             priority={priority}
             className="h-full w-full"
           />
-          <span className="absolute left-2 top-2 rounded-md border border-white/20 bg-black/70 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white backdrop-blur-sm">
+          <span className="absolute left-1.5 top-1.5 rounded-md border border-white/20 bg-black/75 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white backdrop-blur-sm sm:left-2 sm:top-2">
             {movie.age_rating}
           </span>
-          <span className="absolute bottom-2 right-2 rounded-lg bg-black/65 p-1.5 text-white/80 opacity-0 transition group-hover:opacity-100">
+          <span className="absolute bottom-1.5 right-1.5 rounded-lg bg-black/65 p-1.5 text-white/90 opacity-80 transition sm:bottom-2 sm:right-2 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100">
             <Expand className="h-3.5 w-3.5" />
           </span>
         </button>
 
         {/* Info y metadatos */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="font-display text-lg font-bold leading-snug text-white sm:text-xl">
                 {localized.title}
@@ -104,7 +104,7 @@ export function MovieCard({
                 {movie.duration_minutes && (
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {formatDuration(movie.duration_minutes)}
+                    {formatDuration(movie.duration_minutes, t.durationEmpty)}
                   </span>
                 )}
                 {localized.genres.slice(0, 2).map((genre) => (
@@ -202,6 +202,7 @@ export function MovieCard({
             {ranks.map((rank) => {
               const isSelected = assignedRank === rank;
               const pts = getBordaPoints(rank, topK, scoringMode);
+              const selectedTextColor = getReadableTextColor(movie.palette.accent);
               return (
                 <button
                   key={rank}
@@ -211,7 +212,7 @@ export function MovieCard({
                   aria-pressed={isSelected}
                   className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition active:scale-95 disabled:opacity-50 ${
                     isSelected
-                      ? 'text-slate-950 shadow-md'
+                      ? 'shadow-md'
                       : 'border-white/15 bg-white/5 text-slate-200 hover:border-white/30 hover:bg-white/10'
                   }`}
                   style={
@@ -219,14 +220,15 @@ export function MovieCard({
                       ? {
                           backgroundColor: movie.palette.accent,
                           borderColor: movie.palette.accent,
+                          color: selectedTextColor,
                         }
                       : undefined
                   }
                 >
-                  <span>{rank}º</span>
+                  <span>{t.rankOrdinal(rank)}</span>
                   <span
                     className={`font-mono text-[10px] ${
-                      isSelected ? 'text-slate-900/80' : 'text-slate-400'
+                      isSelected ? 'opacity-90' : 'text-slate-400'
                     }`}
                   >
                     ({pts}p)

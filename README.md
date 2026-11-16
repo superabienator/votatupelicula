@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-* Clave del panel profesorado en Modo Demo: `demo1234`
+* Acceso de Usuario Administrador (`/admin`) en Modo Demo: clave `demo1234`
 * Ejecutar pruebas unitarias e integración: `npm test`
 * Compilar para producción: `npm run build`
 
@@ -73,7 +73,7 @@ supabase link --project-ref TU_PROJECT_REF
 
 # Configura tus secretos privados en el servidor
 supabase secrets set \
-  ADMIN_SECRET="clave-segura-profesorado" \
+  ADMIN_SECRET="clave-segura-administrador" \
   TMDB_API_KEY="tu_api_key_gratuita_de_tmdb" \
   GEMINI_API_KEY="opcional_clave_gemini_flash" \
   GAS_EMAIL_WEBHOOK_URL="https://script.google.com/macros/s/.../exec" \

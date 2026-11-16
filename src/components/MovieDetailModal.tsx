@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, ExternalLink, Film, PlayCircle, ShieldCheck, X } from 'lucide-react';
+import { useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import {
   LANGUAGE_LABELS,
@@ -8,7 +9,8 @@ import {
 } from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatDuration, getBordaPoints } from '../utils/borda';
-import { hexToRgba } from '../utils/colorExtractor';
+import { getReadableTextColor, hexToRgba } from '../utils/colorExtractor';
+import { sanitizeSafeHttpUrl } from '../utils/urlSafety';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 
@@ -32,10 +34,14 @@ export function MovieDetailModal({
   onClose,
 }: MovieDetailModalProps) {
   const { lang, t } = useI18n();
+  const [backdropFailedUrl, setBackdropFailedUrl] = useState<string | null>(null);
   useEscapeKey(Boolean(movie), onClose);
 
   const localized = movie ? getLocalizedMovie(movie, lang) : null;
   const trailer = movie ? resolveMovieTrailer(movie, lang) : null;
+  const safeBackdropUrl = movie ? sanitizeSafeHttpUrl(movie.backdrop_url) : null;
+  const showBackdropImg = Boolean(safeBackdropUrl && backdropFailedUrl !== safeBackdropUrl);
+
   return (
     <AnimatePresence>
       {movie && (
@@ -49,7 +55,8 @@ export function MovieDetailModal({
           <motion.div
             role="dialog"
             aria-modal="true"
-            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/15 bg-[#0d101b] shadow-2xl"
+            aria-labelledby="movie-detail-title"
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-2xl"
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -57,10 +64,11 @@ export function MovieDetailModal({
           >
             {/* Cabecera Backdrop */}
             <div className="relative h-48 w-full overflow-hidden sm:h-60">
-              {movie.backdrop_url ? (
+              {showBackdropImg && safeBackdropUrl ? (
                 <img
-                  src={movie.backdrop_url}
-                  alt={movie.title}
+                  src={safeBackdropUrl}
+                  alt={localized?.title || movie.title}
+                  onError={() => setBackdropFailedUrl(safeBackdropUrl)}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -71,11 +79,11 @@ export function MovieDetailModal({
                   }}
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0d101b] via-[#0d101b]/55 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#12172e] via-[#12172e]/55 to-transparent" />
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Cerrar ficha"
+                aria-label={t.closeBtn}
                 className="absolute right-4 top-4 rounded-xl border border-white/15 bg-black/55 p-2 text-white backdrop-blur-md transition hover:bg-black/80"
               >
                 <X className="h-5 w-5" />
@@ -96,7 +104,10 @@ export function MovieDetailModal({
                 </div>
 
                 <div className="pt-2 sm:pt-14">
-                  <h2 className="font-display text-2xl font-extrabold text-white">
+                  <h2
+                    id="movie-detail-title"
+                    className="font-display text-2xl font-extrabold text-white"
+                  >
                     {localized?.title || movie.title}
                   </h2>
                   {movie.original_title &&
@@ -116,7 +127,7 @@ export function MovieDetailModal({
                     {movie.duration_minutes && (
                       <span className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-slate-200">
                         <Clock className="h-3.5 w-3.5" />
-                        {formatDuration(movie.duration_minutes)}
+                        {formatDuration(movie.duration_minutes, t.durationEmpty)}
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-400/15 px-2 py-1 font-mono font-bold text-amber-300">
@@ -195,17 +206,19 @@ export function MovieDetailModal({
                   <div className="flex flex-wrap gap-2">
                     {Array.from({ length: topK }, (_, i) => i + 1).map((rank) => {
                       const active = assignedRank === rank;
+                      const pts = getBordaPoints(rank, topK, scoringMode);
                       return (
                         <button
                           key={rank}
                           type="button"
+                          aria-pressed={active}
                           onClick={() => {
                             onAssignRank(movie.id, rank);
                             onClose();
                           }}
                           className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition ${
                             active
-                              ? 'text-slate-950'
+                              ? 'shadow-md'
                               : 'border-white/15 bg-white/5 text-white hover:bg-white/10'
                           }`}
                           style={
@@ -213,12 +226,13 @@ export function MovieDetailModal({
                               ? {
                                   backgroundColor: movie.palette.accent,
                                   borderColor: movie.palette.accent,
+                                  color: getReadableTextColor(movie.palette.accent),
                                 }
                               : undefined
                           }
                         >
-                          {t.rankOptionLabel(rank)} ({getBordaPoints(rank, topK, scoringMode)}{' '}
-                          {t.ptPlural})
+                          {t.rankOptionLabel(rank)} ({pts}{' '}
+                          {pts === 1 ? t.ptSingular : t.ptPlural})
                         </button>
                       );
                     })}

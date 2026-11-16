@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Loader2,
   Lock,
+  LogOut,
   Palette,
   Plus,
   Rocket,
@@ -19,9 +20,9 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
-import { LANGUAGE_LABELS, getMovieTrailersMap } from '../i18n/translations';
+import { LANGUAGE_LABELS, getLocalizedMovie, getMovieTrailersMap } from '../i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from '../services/api';
 import type {
   AppLanguage,
@@ -31,6 +32,7 @@ import type {
   VotingSettings,
 } from '../types/cinema';
 import { extractPaletteFromImageCanvas } from '../utils/colorExtractor';
+import { formatDuration } from '../utils/borda';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 import { ResultsDashboard } from './ResultsDashboard';
@@ -38,6 +40,7 @@ import { ResultsDashboard } from './ResultsDashboard';
 interface AdminPortalModalProps {
   open: boolean;
   onClose: () => void;
+  onAdminLogout?: () => void;
   onPublicDataChanged: () => Promise<void>;
 }
 
@@ -46,9 +49,11 @@ type AdminTab = 'movies' | 'settings' | 'results';
 export function AdminPortalModal({
   open,
   onClose,
+  onAdminLogout,
   onPublicDataChanged,
 }: AdminPortalModalProps) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
+  const tx = t.adminExtra;
   const [adminSecret, setAdminSecret] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -63,6 +68,8 @@ export function AdminPortalModal({
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(
     null
   );
+  const [resultsSubModalOpen, setResultsSubModalOpen] = useState(false);
+  const [confirmDeleteMovieId, setConfirmDeleteMovieId] = useState<string | null>(null);
 
   // Fase 1: lista de títulos para barrido inteligente
   const [titlesInput, setTitlesInput] = useState(
@@ -77,6 +84,30 @@ export function AdminPortalModal({
   const [editLangTab, setEditLangTab] = useState<AppLanguage>('es');
   const [editI18n, setEditI18n] = useState<Partial<Record<AppLanguage, MovieLocalizedFields>>>({});
   const [extractingPalette, setExtractingPalette] = useState(false);
+
+  const clearAdminMemorySession = useCallback(() => {
+    setAuthenticated(false);
+    setAdminSecret('');
+    setAuthError(null);
+    setMovies([]);
+    setResults(null);
+    setEditingMovie(null);
+    setConfirmDeleteMovieId(null);
+    setResultsSubModalOpen(false);
+    setFeedback(null);
+    setBusyMessage(null);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      clearAdminMemorySession();
+    }
+  }, [open, clearAdminMemorySession]);
+
+  function handleClosePortal() {
+    clearAdminMemorySession();
+    onClose();
+  }
 
   function openEditModal(movie: Movie) {
     const trailers = getMovieTrailersMap(movie);
@@ -94,7 +125,8 @@ export function AdminPortalModal({
   const [classesText, setClassesText] = useState('');
   const [domainsText, setDomainsText] = useState('');
 
-  useEscapeKey(open && !editingMovie, onClose);
+  useEscapeKey(Boolean(editingMovie), () => setEditingMovie(null));
+  useEscapeKey(open && !editingMovie && !resultsSubModalOpen, handleClosePortal);
 
   async function loadAdminData(secret: string) {
     const data = await cinemaApi.adminListMovies(secret);
@@ -129,7 +161,7 @@ export function AdminPortalModal({
       setAuthenticated(true);
     } catch (err) {
       setAuthError(
-        err instanceof Error ? err.message : 'Clave de administración inválida.'
+        err instanceof Error ? err.message : tx.adminInvalidKeyErr
       );
     } finally {
       setAuthLoading(false);
@@ -142,26 +174,24 @@ export function AdminPortalModal({
       .map((l) => l.trim())
       .filter(Boolean);
     if (titles.length === 0) {
-      setFeedback({ type: 'err', text: 'Escribe al menos un título de película.' });
+      setFeedback({ type: 'err', text: tx.adminScanEmptyErr });
       return;
     }
 
     setFeedback(null);
-    setBusyMessage(
-      `Ejecutando barrido inteligente para ${titles.length} título(s) y extrayendo paletas…`
-    );
+    setBusyMessage(tx.adminBusyEnriching(titles.length));
     try {
       const created = await cinemaApi.adminEnrichBatch(adminSecret, titles);
       await loadAdminData(adminSecret);
       setTitlesInput('');
       setFeedback({
         type: 'ok',
-        text: `Fase 1 completada: ${created.length} ficha(s) generada(s) en estado Borrador (draft) listas para revisar.`,
+        text: tx.adminOkEnriched(created.length),
       });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Error en el barrido inteligente.',
+        text: err instanceof Error ? err.message : tx.adminScanEmptyErr,
       });
     } finally {
       setBusyMessage(null);
@@ -169,23 +199,23 @@ export function AdminPortalModal({
   }
 
   async function handleAddManualDraft() {
-    setBusyMessage('Creando ficha en borrador…');
+    setBusyMessage(tx.adminBusyEnriching(1));
     try {
       const created = await cinemaApi.adminCreateManual(adminSecret, {
-        title: 'Nueva película',
+        title: tx.adminManualDefaultTitle,
         year: 2024,
         duration_minutes: 110,
         genres: ['CineFórum'],
         tags: ['Debate'],
         age_rating: '+12',
-        synopsis: 'Escribe aquí una sinopsis atractiva para el alumnado.',
+        synopsis: tx.adminManualDefaultSynopsis,
       });
       await loadAdminData(adminSecret);
       openEditModal(created);
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Error creando ficha manual.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -195,7 +225,7 @@ export function AdminPortalModal({
   async function handleSaveMovieEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingMovie) return;
-    setBusyMessage('Guardando cambios de la ficha…');
+    setBusyMessage(tx.adminBusySavingSettings);
     try {
       const parsedGenres = editGenresText
         .split(',')
@@ -234,11 +264,11 @@ export function AdminPortalModal({
       await loadAdminData(adminSecret);
       await onPublicDataChanged();
       setEditingMovie(null);
-      setFeedback({ type: 'ok', text: 'Ficha actualizada correctamente.' });
+      setFeedback({ type: 'ok', text: tx.adminOkMovieUpdated });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo actualizar la ficha.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -260,7 +290,7 @@ export function AdminPortalModal({
   }
 
   async function handlePublishDrafts() {
-    setBusyMessage('Publicando cartelera aprobada para el alumnado…');
+    setBusyMessage(tx.adminBusySavingSettings);
     setFeedback(null);
     try {
       const published = await cinemaApi.adminPublishBillboard(adminSecret);
@@ -268,12 +298,12 @@ export function AdminPortalModal({
       await onPublicDataChanged();
       setFeedback({
         type: 'ok',
-        text: `¡Cartelera publicada! ${published.length} borrador(es) pasaron a estado "published" y ya son visibles para votar.`,
+        text: tx.adminOkPublished(published.length),
       });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo publicar la cartelera.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -282,7 +312,7 @@ export function AdminPortalModal({
 
   async function handleToggleMovieStatus(movie: Movie) {
     const nextStatus = movie.status === 'published' ? 'draft' : 'published';
-    setBusyMessage('Actualizando estado…');
+    setBusyMessage(tx.adminBusyUpdatingVote);
     try {
       await cinemaApi.adminUpdateMovie(adminSecret, movie.id, { status: nextStatus });
       await loadAdminData(adminSecret);
@@ -290,7 +320,7 @@ export function AdminPortalModal({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Error al cambiar el estado.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -298,7 +328,8 @@ export function AdminPortalModal({
   }
 
   async function handleDeleteMovie(movie: Movie) {
-    setBusyMessage('Eliminando / archivando película…');
+    setConfirmDeleteMovieId(null);
+    setBusyMessage(tx.adminBusyDeletingVote);
     try {
       const res = await cinemaApi.adminDeleteMovie(adminSecret, movie.id);
       await loadAdminData(adminSecret);
@@ -309,7 +340,7 @@ export function AdminPortalModal({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo eliminar.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -321,7 +352,7 @@ export function AdminPortalModal({
     if (targetIndex < 0 || targetIndex >= movies.length) return;
     const currentMovie = movies[index];
     const swapMovie = movies[targetIndex];
-    setBusyMessage('Reordenando cartelera…');
+    setBusyMessage(tx.adminBusySavingSettings);
     try {
       await Promise.all([
         cinemaApi.adminUpdateMovie(adminSecret, currentMovie.id, {
@@ -336,7 +367,7 @@ export function AdminPortalModal({
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo reordenar.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -344,20 +375,21 @@ export function AdminPortalModal({
   }
 
   async function handleResetVotes() {
-    setBusyMessage('Vaciando urna y reiniciando votos a cero…');
+    setBusyMessage(tx.adminBusyResetting);
     setFeedback(null);
     try {
       await cinemaApi.adminResetVotes(adminSecret);
       await loadAdminData(adminSecret);
       await loadResults(adminSecret);
+      await onPublicDataChanged();
       setFeedback({
         type: 'ok',
-        text: 'Urna vaciada a cero. Todos los votos y códigos OTP se han borrado.',
+        text: tx.adminOkResetVotes,
       });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo vaciar la urna.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -365,16 +397,17 @@ export function AdminPortalModal({
   }
 
   async function handleDeleteVote(voteId: string) {
-    setBusyMessage('Anulando voto seleccionado…');
+    setBusyMessage(tx.adminBusyDeletingVote);
     try {
       await cinemaApi.adminDeleteVote(adminSecret, voteId);
       await loadAdminData(adminSecret);
       await loadResults(adminSecret);
-      setFeedback({ type: 'ok', text: 'Voto anulado correctamente.' });
+      await onPublicDataChanged();
+      setFeedback({ type: 'ok', text: tx.adminOkVoteDeleted });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo anular el voto.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -385,15 +418,16 @@ export function AdminPortalModal({
     voteId: string,
     patch: { curso?: string; ranked_movie_ids?: string[] }
   ) {
-    setBusyMessage('Actualizando voto…');
+    setBusyMessage(tx.adminBusyUpdatingVote);
     try {
       await cinemaApi.adminUpdateVote(adminSecret, voteId, patch);
       await loadResults(adminSecret);
-      setFeedback({ type: 'ok', text: 'Voto modificado y escrutinio recalculado.' });
+      await onPublicDataChanged();
+      setFeedback({ type: 'ok', text: tx.adminOkVoteUpdated });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'No se pudo modificar el voto.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -406,7 +440,7 @@ export function AdminPortalModal({
   ) {
     e?.preventDefault();
     if (!settings) return;
-    setBusyMessage('Guardando configuración de votación y tema visual…');
+    setBusyMessage(tx.adminBusySavingSettings);
     try {
       const allowedClasses = classesText
         .split('\n')
@@ -427,12 +461,12 @@ export function AdminPortalModal({
       await onPublicDataChanged();
       setFeedback({
         type: 'ok',
-        text: 'Configuración y tematización visual actualizadas.',
+        text: tx.adminOkSettingsSaved,
       });
     } catch (err) {
       setFeedback({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Error al guardar configuración.',
+        text: err instanceof Error ? err.message : t.loadErrorFallback,
       });
     } finally {
       setBusyMessage(null);
@@ -476,14 +510,29 @@ export function AdminPortalModal({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10"
-              >
-                <X className="h-4 w-4" />
-                {t.backToPublicBtn}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {authenticated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearAdminMemorySession();
+                      onAdminLogout?.();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-400/35 bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-200 transition hover:bg-rose-500/25"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    {t.adminLogoutBtn}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClosePortal}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10"
+                >
+                  <X className="h-4 w-4" />
+                  {t.backToPublicBtn}
+                </button>
+              </div>
             </div>
 
             {/* LOGIN DE ADMIN */}
@@ -512,21 +561,29 @@ export function AdminPortalModal({
                   )}
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-300">
+                    <label
+                      htmlFor="admin-secret-input"
+                      className="mb-1 block text-xs font-semibold text-slate-300"
+                    >
                       {t.adminKeyLabel}
                     </label>
                     <input
+                      id="admin-secret-input"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={adminSecret}
                       onChange={(e) => setAdminSecret(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full rounded-xl border border-white/15 bg-black/50 px-3.5 py-2.5 text-sm text-white focus:border-amber-400 focus:outline-none"
+                      className="w-full rounded-xl border border-white/15 bg-black/50 px-3.5 py-2.5 text-base text-white focus:border-amber-400 sm:text-sm"
                     />
                   </div>
 
                   {authError && (
-                    <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200">
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200"
+                    >
                       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                       <span>{authError}</span>
                     </div>
@@ -552,21 +609,25 @@ export function AdminPortalModal({
               <>
                 {/* Pestañas */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-                  <div className="flex flex-wrap gap-2">
+                  <div
+                    role="tablist"
+                    aria-label={t.adminHeaderTitle}
+                    className="flex flex-wrap gap-2"
+                  >
                     {[
                       {
                         id: 'movies' as const,
-                        label: `Cartelera (${publishedMovies.length} pub · ${draftMovies.length} borrador)`,
+                        label: t.tabBillboard(publishedMovies.length, draftMovies.length),
                         icon: LayoutGrid,
                       },
                       {
                         id: 'results' as const,
-                        label: `Dashboard de Resultados (${totalVotes} votos)`,
+                        label: t.tabResults(totalVotes),
                         icon: BarChart3,
                       },
                       {
                         id: 'settings' as const,
-                        label: 'Configuración y Reglas',
+                        label: t.tabSettings,
                         icon: Settings2,
                       },
                     ].map((tab) => {
@@ -576,6 +637,8 @@ export function AdminPortalModal({
                         <button
                           key={tab.id}
                           type="button"
+                          role="tab"
+                          aria-selected={active}
                           onClick={() => setActiveTab(tab.id)}
                           className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                             active
@@ -591,7 +654,10 @@ export function AdminPortalModal({
                   </div>
 
                   {busyMessage && (
-                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-sky-300">
+                    <span
+                      role="status"
+                      className="inline-flex items-center gap-2 text-xs font-semibold text-sky-300"
+                    >
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       {busyMessage}
                     </span>
@@ -599,9 +665,10 @@ export function AdminPortalModal({
                 </div>
 
                 {/* Cuerpo con scroll */}
-                <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+                <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
                   {feedback && (
                     <div
+                      role={feedback.type === 'err' ? 'alert' : 'status'}
                       className={`mb-5 flex items-center justify-between gap-3 rounded-2xl border p-3.5 text-xs ${
                         feedback.type === 'ok'
                           ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
@@ -618,6 +685,7 @@ export function AdminPortalModal({
                       </span>
                       <button
                         type="button"
+                        aria-label={t.closeBtn}
                         onClick={() => setFeedback(null)}
                         className="opacity-70 hover:opacity-100"
                       >
@@ -635,19 +703,13 @@ export function AdminPortalModal({
                           <div>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[11px] font-bold text-sky-300">
                               <Wand2 className="h-3 w-3" />
-                              Fase 1 · Draft Generation
+                              {t.phase1Badge}
                             </span>
                             <h3 className="mt-1.5 font-display text-lg font-extrabold text-white">
-                              Barrido inteligente por títulos
+                              {t.phase1Title}
                             </h3>
                             <p className="mt-0.5 text-xs text-slate-300">
-                              Escribe una lista de películas (una por línea). El sistema
-                              recupera pósters HD, sinopsis juvenil, duración, edad y paleta
-                              cromática dominante en estado{' '}
-                              <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-amber-300">
-                                draft
-                              </code>
-                              .
+                              {t.phase1Desc}
                             </p>
                           </div>
 
@@ -658,17 +720,18 @@ export function AdminPortalModal({
                             className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            Añadir ficha manual
+                            {t.addManualBtn}
                           </button>
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
                           <textarea
                             rows={3}
+                            aria-label={t.phase1Title}
                             value={titlesInput}
                             onChange={(e) => setTitlesInput(e.target.value)}
-                            placeholder={'Interstellar\nSpider-Man: Un nuevo universo\nLa sociedad de la nieve'}
-                            className="w-full rounded-2xl border border-white/15 bg-black/45 p-3.5 text-sm text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
+                            placeholder={tx.adminTitlesPlaceholder}
+                            className="w-full rounded-2xl border border-white/15 bg-black/45 p-3.5 text-sm text-white placeholder:text-slate-400 focus:border-sky-400"
                           />
                           <button
                             type="button"
@@ -677,7 +740,7 @@ export function AdminPortalModal({
                             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-400 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-sky-300 disabled:opacity-50"
                           >
                             <Sparkles className="h-4 w-4" />
-                            Generar borradores
+                            {t.generateDraftsBtn}
                           </button>
                         </div>
                       </section>
@@ -688,10 +751,10 @@ export function AdminPortalModal({
                           <div>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
                               <Eye className="h-3 w-3" />
-                              Fase 2 · Consistencia y Aprobación
+                              {t.phase2Badge}
                             </span>
                             <h3 className="mt-1.5 font-display text-lg font-extrabold text-white">
-                              Previsualización, tema visual y publicación
+                              {t.phase2Title}
                             </h3>
                           </div>
 
@@ -702,19 +765,22 @@ export function AdminPortalModal({
                             className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 px-5 py-3 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Rocket className="h-4 w-4" />
-                            Aprobar y Publicar Cartelera ({draftMovies.length} borrador
-                            {draftMovies.length === 1 ? '' : 'es'})
+                            {t.publishBillboardBtn(draftMovies.length)}
                           </button>
                         </div>
 
                         {/* Selector de Tema Visual */}
                         {settings && (
                           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/35 p-3.5">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                            <label
+                              htmlFor="admin-theme-mode"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-200"
+                            >
                               <Palette className="h-4 w-4 text-amber-400" />
-                              Tema visual público:
-                            </span>
+                              {t.visualThemeLabel}
+                            </label>
                             <select
+                              id="admin-theme-mode"
                               value={settings.theme_mode}
                               onChange={(e) =>
                                 handleSaveSettings({
@@ -724,15 +790,16 @@ export function AdminPortalModal({
                               className="rounded-xl border border-white/15 bg-[#090c16] px-3 py-1.5 text-xs font-semibold text-white"
                             >
                               <option value="blend">
-                                Blend dinámico (cambia según las pelis publicadas y hover)
+                                {tx.adminThemeBlendOpt}
                               </option>
                               <option value="featured">
-                                Película principal fija (seleccionar abajo)
+                                {tx.adminThemeFeaturedOpt}
                               </option>
                             </select>
 
                             {settings.theme_mode === 'featured' && (
                               <select
+                                aria-label={tx.adminThemeFeaturedOpt}
                                 value={settings.featured_movie_id || ''}
                                 onChange={(e) =>
                                   handleSaveSettings({
@@ -741,10 +808,10 @@ export function AdminPortalModal({
                                 }
                                 className="rounded-xl border border-white/15 bg-[#090c16] px-3 py-1.5 text-xs font-semibold text-white"
                               >
-                                <option value="">Selecciona película tema…</option>
+                                <option value="">{tx.adminThemeSelectMovieOpt}</option>
                                 {movies.map((m) => (
                                   <option key={m.id} value={m.id}>
-                                    {m.title} ({m.status})
+                                    {getLocalizedMovie(m, lang).title} ({m.status})
                                   </option>
                                 ))}
                               </select>
@@ -754,118 +821,141 @@ export function AdminPortalModal({
 
                         {/* Grid de fichas Draft y Published */}
                         <div className="grid gap-4 md:grid-cols-2">
-                          {movies.map((movie, idx) => (
-                            <div
-                              key={movie.id}
-                              className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0d111e] p-4"
-                            >
-                              <div className="flex gap-3.5">
-                                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10">
-                                  <MoviePoster
-                                    title={movie.title}
-                                    year={movie.year}
-                                    posterUrl={movie.poster_url}
-                                    palette={movie.palette}
-                                    compact
-                                    className="h-full w-full"
-                                  />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span
-                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                        movie.status === 'published'
-                                          ? 'bg-emerald-500/20 text-emerald-300'
+                          {movies.map((movie, idx) => {
+                            const loc = getLocalizedMovie(movie, lang);
+                            return (
+                              <div
+                                key={movie.id}
+                                className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0d111e] p-4"
+                              >
+                                <div className="flex gap-3.5">
+                                  <div className="h-28 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10">
+                                    <MoviePoster
+                                      title={loc.title}
+                                      year={movie.year}
+                                      posterUrl={movie.poster_url}
+                                      palette={movie.palette}
+                                      compact
+                                      className="h-full w-full"
+                                    />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                          movie.status === 'published'
+                                            ? 'bg-emerald-500/20 text-emerald-300'
+                                            : movie.status === 'draft'
+                                              ? 'bg-amber-400/20 text-amber-300'
+                                              : 'bg-slate-600/30 text-slate-300'
+                                        }`}
+                                      >
+                                        {movie.status === 'published'
+                                          ? tx.adminStatusPublished
                                           : movie.status === 'draft'
-                                            ? 'bg-amber-400/20 text-amber-300'
-                                            : 'bg-slate-600/30 text-slate-300'
-                                      }`}
+                                            ? tx.adminStatusDraft
+                                            : tx.adminStatusArchived}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        {[
+                                          movie.palette.primary,
+                                          movie.palette.secondary,
+                                          movie.palette.accent,
+                                        ].map((hex, i) => (
+                                          <span
+                                            key={i}
+                                            title={hex}
+                                            className="h-3.5 w-3.5 rounded-full border border-white/25"
+                                            style={{ backgroundColor: hex }}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <h4 className="mt-1 truncate font-display text-base font-bold text-white">
+                                      {loc.title}
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400">
+                                      {movie.year || t.durationEmpty} ·{' '}
+                                      {formatDuration(movie.duration_minutes, t.durationEmpty)} ·{' '}
+                                      {movie.age_rating}
+                                    </p>
+                                    <p className="mt-1.5 line-clamp-2 text-xs text-slate-300">
+                                      {loc.synopsis}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={idx === 0 || Boolean(busyMessage)}
+                                      onClick={() => handleMoveMovieOrder(idx, -1)}
+                                      title={tx.adminMoveUpAria(loc.title)}
+                                      aria-label={tx.adminMoveUpAria(loc.title)}
+                                      className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 disabled:opacity-30"
+                                    >
+                                      <ArrowUp className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={idx === movies.length - 1 || Boolean(busyMessage)}
+                                      onClick={() => handleMoveMovieOrder(idx, 1)}
+                                      title={tx.adminMoveDownAria(loc.title)}
+                                      aria-label={tx.adminMoveDownAria(loc.title)}
+                                      className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 disabled:opacity-30"
+                                    >
+                                      <ArrowDown className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditModal(movie)}
+                                      className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/10"
+                                    >
+                                      {t.editMovieBtn}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleMovieStatus(movie)}
+                                      className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold text-sky-300 hover:bg-white/10"
                                     >
                                       {movie.status === 'published'
-                                        ? 'Visible al alumnado'
-                                        : movie.status === 'draft'
-                                          ? 'Borrador oculto'
-                                          : 'Archivada'}
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                      {[
-                                        movie.palette.primary,
-                                        movie.palette.secondary,
-                                        movie.palette.accent,
-                                      ].map((hex, i) => (
-                                        <span
-                                          key={i}
-                                          title={hex}
-                                          className="h-3.5 w-3.5 rounded-full border border-white/25"
-                                          style={{ backgroundColor: hex }}
-                                        />
-                                      ))}
-                                    </div>
+                                        ? t.hideDraftBtn
+                                        : t.publishMovieBtn}
+                                    </button>
                                   </div>
-                                  <h4 className="mt-1 truncate font-display text-base font-bold text-white">
-                                    {movie.title}
-                                  </h4>
-                                  <p className="text-[11px] text-slate-400">
-                                    {movie.year || 'N/D'} · {movie.duration_minutes || '?'} min ·{' '}
-                                    {movie.age_rating}
-                                  </p>
-                                  <p className="mt-1.5 line-clamp-2 text-xs text-slate-300">
-                                    {movie.synopsis}
-                                  </p>
+
+                                  {confirmDeleteMovieId === movie.id ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteMovie(movie)}
+                                        className="rounded-lg bg-rose-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-rose-500"
+                                      >
+                                        {tx.adminDeleteAria(loc.title).split(' ')[0]}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteMovieId(null)}
+                                        className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[11px] font-bold text-slate-200 hover:bg-white/10"
+                                      >
+                                        {t.cancelBtn}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeleteMovieId(movie.id)}
+                                      aria-label={tx.adminDeleteAria(loc.title)}
+                                      className="rounded-lg border border-rose-500/25 bg-rose-500/10 p-1.5 text-rose-300 hover:bg-rose-500/20"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-
-                              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
-                                <div className="flex flex-wrap gap-1.5">
-                                  <button
-                                    type="button"
-                                    disabled={idx === 0 || Boolean(busyMessage)}
-                                    onClick={() => handleMoveMovieOrder(idx, -1)}
-                                    title="Subir en la cartelera"
-                                    aria-label={`Subir ${movie.title}`}
-                                    className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 disabled:opacity-30"
-                                  >
-                                    <ArrowUp className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={idx === movies.length - 1 || Boolean(busyMessage)}
-                                    onClick={() => handleMoveMovieOrder(idx, 1)}
-                                    title="Bajar en la cartelera"
-                                    aria-label={`Bajar ${movie.title}`}
-                                    className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 disabled:opacity-30"
-                                  >
-                                    <ArrowDown className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditModal(movie)}
-                                    className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-white/10"
-                                  >
-                                    Modificar ficha
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleMovieStatus(movie)}
-                                    className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold text-sky-300 hover:bg-white/10"
-                                  >
-                                    {movie.status === 'published'
-                                      ? 'Ocultar (Borrador)'
-                                      : 'Publicar'}
-                                  </button>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMovie(movie)}
-                                  aria-label={`Eliminar ${movie.title}`}
-                                  className="rounded-lg border border-rose-500/25 bg-rose-500/10 p-1.5 text-rose-300 hover:bg-rose-500/20"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </section>
                     </div>
@@ -878,15 +968,19 @@ export function AdminPortalModal({
                       className="mx-auto max-w-3xl space-y-5 rounded-3xl border border-white/15 bg-white/[0.02] p-6"
                     >
                       <h3 className="font-display text-lg font-extrabold text-white">
-                        Parámetros de la Votación y Seguridad Escolar
+                        {tx.adminSettingsTitle}
                       </h3>
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Título de campaña
+                          <label
+                            htmlFor="admin-campaign-title"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminCampaignTitleLabel}
                           </label>
                           <input
+                            id="admin-campaign-title"
                             type="text"
                             value={settings.campaign_title}
                             onChange={(e) =>
@@ -896,10 +990,14 @@ export function AdminPortalModal({
                           />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Estado de la urna
+                          <label
+                            htmlFor="admin-voting-status"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminVotingStatusLabel}
                           </label>
                           <select
+                            id="admin-voting-status"
                             value={settings.voting_open ? 'open' : 'closed'}
                             onChange={(e) =>
                               setSettings({
@@ -909,17 +1007,21 @@ export function AdminPortalModal({
                             }
                             className="w-full rounded-xl border border-white/15 bg-[#090c16] px-3 py-2 text-sm text-white"
                           >
-                            <option value="open">Abierta (alumnado puede votar)</option>
-                            <option value="closed">Cerrada (solo lectura)</option>
+                            <option value="open">{tx.adminVotingOpenOpt}</option>
+                            <option value="closed">{tx.adminVotingClosedOpt}</option>
                           </select>
                         </div>
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-xs font-semibold text-slate-300">
-                          Subtítulo educativo
+                        <label
+                          htmlFor="admin-campaign-subtitle"
+                          className="mb-1 block text-xs font-semibold text-slate-300"
+                        >
+                          {tx.adminSubtitleLabel}
                         </label>
                         <input
+                          id="admin-campaign-subtitle"
                           type="text"
                           value={settings.subtitle}
                           onChange={(e) =>
@@ -931,10 +1033,14 @@ export function AdminPortalModal({
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Número de preferencias a ordenar
+                          <label
+                            htmlFor="admin-top-k"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminTopKLabel}
                           </label>
                           <select
+                            id="admin-top-k"
                             value={settings.top_k}
                             onChange={(e) =>
                               setSettings({
@@ -944,16 +1050,20 @@ export function AdminPortalModal({
                             }
                             className="w-full rounded-xl border border-white/15 bg-[#090c16] px-3 py-2 text-sm text-white"
                           >
-                            <option value={3}>TOP 3 (recomendado)</option>
-                            <option value={5}>TOP 5</option>
+                            <option value={3}>{tx.adminTop3Opt}</option>
+                            <option value={5}>{tx.adminTop5Opt}</option>
                           </select>
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Escala de puntuación Borda
+                          <label
+                            htmlFor="admin-scoring-mode"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminScoringModeLabel}
                           </label>
                           <select
+                            id="admin-scoring-mode"
                             value={settings.scoring_mode}
                             onChange={(e) =>
                               setSettings({
@@ -964,10 +1074,10 @@ export function AdminPortalModal({
                             className="w-full rounded-xl border border-white/15 bg-[#090c16] px-3 py-2 text-sm text-white"
                           >
                             <option value="classic">
-                              Clásico (3 pts, 2 pts, 1 pt)
+                              {tx.adminScoringClassicOpt}
                             </option>
                             <option value="fractional">
-                              Decreciente (1 pt, 0.5 pts, 0.25 pts)
+                              {tx.adminScoringFractionalOpt}
                             </option>
                           </select>
                         </div>
@@ -975,10 +1085,14 @@ export function AdminPortalModal({
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Cursos / Grupos permitidos (uno por línea)
+                          <label
+                            htmlFor="admin-allowed-classes"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminClassesLabel}
                           </label>
                           <textarea
+                            id="admin-allowed-classes"
                             rows={6}
                             value={classesText}
                             onChange={(e) => setClassesText(e.target.value)}
@@ -986,19 +1100,22 @@ export function AdminPortalModal({
                           />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-300">
-                            Dominios de correo del centro (opcional, separados por coma)
+                          <label
+                            htmlFor="admin-allowed-domains"
+                            className="mb-1 block text-xs font-semibold text-slate-300"
+                          >
+                            {tx.adminDomainsLabel}
                           </label>
                           <textarea
+                            id="admin-allowed-domains"
                             rows={3}
                             value={domainsText}
                             onChange={(e) => setDomainsText(e.target.value)}
-                            placeholder="Ej: iesejemplo.es, educa.madrid.org (vacío = cualquier correo válido no desechable)"
-                            className="w-full rounded-xl border border-white/15 bg-black/45 p-3 font-mono text-xs text-white"
+                            placeholder={tx.adminDomainsPh}
+                            className="w-full rounded-xl border border-white/15 bg-black/45 p-3 font-mono text-xs text-white placeholder:text-slate-400"
                           />
                           <p className="mt-2 text-[11px] text-slate-400">
-                            La lista negra de dominios temporales/desechables (mailinator,
-                            yopmail, 10minutemail…) siempre permanece activa.
+                            {tx.adminDisposableAlwaysOn}
                           </p>
                         </div>
                       </div>
@@ -1008,7 +1125,7 @@ export function AdminPortalModal({
                         disabled={Boolean(busyMessage)}
                         className="rounded-2xl bg-amber-400 px-6 py-3 text-sm font-extrabold text-slate-950 transition hover:bg-amber-300"
                       >
-                        Guardar configuración
+                        {tx.adminSaveSettingsBtn}
                       </button>
                     </form>
                   )}
@@ -1020,12 +1137,13 @@ export function AdminPortalModal({
                       movies={movies}
                       loading={Boolean(busyMessage)}
                       onRefresh={() => {
-                        setBusyMessage('Actualizando escrutinio…');
+                        setBusyMessage(tx.adminRefreshingResultsMsg);
                         loadResults(adminSecret).finally(() => setBusyMessage(null));
                       }}
                       onResetVotes={handleResetVotes}
                       onDeleteVote={handleDeleteVote}
                       onUpdateVote={handleUpdateVote}
+                      onSubModalOpenChange={setResultsSubModalOpen}
                     />
                   )}
                 </div>
@@ -1034,18 +1152,29 @@ export function AdminPortalModal({
 
             {/* Sub-modal de edición de película individual */}
             {editingMovie && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+              <div
+                className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+                onClick={() => setEditingMovie(null)}
+              >
                 <form
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="movie-editor-modal-title"
+                  onClick={(e) => e.stopPropagation()}
                   onSubmit={handleSaveMovieEdit}
-                  className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-3xl border border-white/20 bg-[#101526] p-6 shadow-2xl"
+                  className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] p-6 shadow-2xl"
                 >
                   <div className="flex items-center justify-between">
-                    <h4 className="flex items-center gap-2 font-display text-lg font-bold text-white">
+                    <h4
+                      id="movie-editor-modal-title"
+                      className="flex items-center gap-2 font-display text-lg font-bold text-white"
+                    >
                       <Film className="h-4 w-4 text-amber-400" />
-                      Editor gráfico de película
+                      {t.editorModalTitle}
                     </h4>
                     <button
                       type="button"
+                      aria-label={t.closeBtn}
                       onClick={() => setEditingMovie(null)}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
                     >
@@ -1096,10 +1225,14 @@ export function AdminPortalModal({
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">
-                        Título de la película
+                      <label
+                        htmlFor="edit-movie-title"
+                        className="mb-1 block text-xs font-semibold text-slate-300"
+                      >
+                        {tx.adminMovieTitleLabel}
                       </label>
                       <input
+                        id="edit-movie-title"
                         type="text"
                         required
                         value={editingMovie.title}
@@ -1110,10 +1243,14 @@ export function AdminPortalModal({
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">
-                        Año de estreno
+                      <label
+                        htmlFor="edit-movie-year"
+                        className="mb-1 block text-xs font-semibold text-slate-300"
+                      >
+                        {tx.adminMovieYearLabel}
                       </label>
                       <input
+                        id="edit-movie-year"
                         type="number"
                         value={editingMovie.year ?? ''}
                         onChange={(e) =>
@@ -1126,10 +1263,14 @@ export function AdminPortalModal({
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">
-                        Duración (minutos)
+                      <label
+                        htmlFor="edit-movie-duration"
+                        className="mb-1 block text-xs font-semibold text-slate-300"
+                      >
+                        {tx.adminMovieDurationLabel}
                       </label>
                       <input
+                        id="edit-movie-duration"
                         type="number"
                         value={editingMovie.duration_minutes ?? ''}
                         onChange={(e) =>
@@ -1148,9 +1289,9 @@ export function AdminPortalModal({
 
                   {/* Selector visual de edad recomendada */}
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-300">
-                      Edad recomendada (pulsa para elegir)
-                    </label>
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-300">
+                      {tx.adminMovieAgeLabel}
+                    </span>
                     <div className="flex flex-wrap gap-2">
                       {['TP', '+7', '+12', '+16', '+18'].map((age) => (
                         <button
@@ -1172,10 +1313,14 @@ export function AdminPortalModal({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Sinopsis breve para el alumnado
+                    <label
+                      htmlFor="edit-movie-synopsis"
+                      className="mb-1 block text-xs font-semibold text-slate-300"
+                    >
+                      {tx.adminMovieSynopsisLabel}
                     </label>
                     <textarea
+                      id="edit-movie-synopsis"
                       rows={3}
                       value={editingMovie.synopsis}
                       onChange={(e) =>
@@ -1187,10 +1332,14 @@ export function AdminPortalModal({
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">
-                        Géneros (separados por coma)
+                      <label
+                        htmlFor="edit-movie-genres"
+                        className="mb-1 block text-xs font-semibold text-slate-300"
+                      >
+                        {tx.adminMovieGenresLabel}
                       </label>
                       <input
+                        id="edit-movie-genres"
                         type="text"
                         value={editGenresText}
                         onChange={(e) => setEditGenresText(e.target.value)}
@@ -1220,10 +1369,14 @@ export function AdminPortalModal({
                       </div>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-300">
-                        Etiquetas temáticas (coma)
+                      <label
+                        htmlFor="edit-movie-tags"
+                        className="mb-1 block text-xs font-semibold text-slate-300"
+                      >
+                        {tx.adminMovieTagsLabel}
                       </label>
                       <input
+                        id="edit-movie-tags"
                         type="text"
                         value={editTagsText}
                         onChange={(e) => setEditTagsText(e.target.value)}
@@ -1255,10 +1408,14 @@ export function AdminPortalModal({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Imagen de portada (URL del póster)
+                    <label
+                      htmlFor="edit-movie-poster"
+                      className="mb-1 block text-xs font-semibold text-slate-300"
+                    >
+                      {tx.adminMoviePosterLabel}
                     </label>
                     <input
+                      id="edit-movie-poster"
                       type="url"
                       value={editingMovie.poster_url}
                       onChange={(e) =>
@@ -1270,10 +1427,14 @@ export function AdminPortalModal({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-300">
-                      Imagen ancha de cabecera (opcional)
+                    <label
+                      htmlFor="edit-movie-backdrop"
+                      className="mb-1 block text-xs font-semibold text-slate-300"
+                    >
+                      {tx.adminMovieBackdropLabel}
                     </label>
                     <input
+                      id="edit-movie-backdrop"
                       type="url"
                       value={editingMovie.backdrop_url}
                       onChange={(e) =>
@@ -1285,16 +1446,20 @@ export function AdminPortalModal({
                   </div>
 
                   {/* Tráilers por idioma (ES / VA / EN) */}
-                  <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5 space-y-2.5">
+                  <div className="space-y-2.5 rounded-2xl border border-white/10 bg-black/35 p-3.5">
                     <span className="block text-xs font-bold text-slate-200">
-                      Tráilers por idioma (YouTube o MP4)
+                      {tx.adminMovieTrailersLabel}
                     </span>
                     <div className="grid gap-2 sm:grid-cols-3">
                       <div>
-                        <label className="mb-1 block text-[11px] text-slate-400">
+                        <label
+                          htmlFor="edit-trailer-es"
+                          className="mb-1 block text-[11px] text-slate-400"
+                        >
                           Castellano (ES)
                         </label>
                         <input
+                          id="edit-trailer-es"
                           type="url"
                           value={editTrailerEs}
                           onChange={(e) => setEditTrailerEs(e.target.value)}
@@ -1303,10 +1468,14 @@ export function AdminPortalModal({
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] text-slate-400">
+                        <label
+                          htmlFor="edit-trailer-va"
+                          className="mb-1 block text-[11px] text-slate-400"
+                        >
                           Valencià (VA)
                         </label>
                         <input
+                          id="edit-trailer-va"
                           type="url"
                           value={editTrailerVa}
                           onChange={(e) => setEditTrailerVa(e.target.value)}
@@ -1315,10 +1484,14 @@ export function AdminPortalModal({
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] text-slate-400">
+                        <label
+                          htmlFor="edit-trailer-en"
+                          className="mb-1 block text-[11px] text-slate-400"
+                        >
                           English (EN)
                         </label>
                         <input
+                          id="edit-trailer-en"
                           type="url"
                           value={editTrailerEn}
                           onChange={(e) => setEditTrailerEn(e.target.value)}
@@ -1330,10 +1503,10 @@ export function AdminPortalModal({
                   </div>
 
                   {/* Traducciones opcionales por idioma (ES / VA / EN) */}
-                  <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5 space-y-2.5">
+                  <div className="space-y-2.5 rounded-2xl border border-white/10 bg-black/35 p-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-bold text-slate-200">
-                        Textos por idioma (opcional)
+                        {tx.adminMovieI18nTitleLabel}
                       </span>
                       <div className="flex gap-1">
                         {(['es', 'va', 'en'] as AppLanguage[]).map((code) => (
@@ -1354,6 +1527,7 @@ export function AdminPortalModal({
                     </div>
                     <input
                       type="text"
+                      aria-label={tx.adminMovieI18nTitlePh(LANGUAGE_LABELS[editLangTab].name)}
                       value={editI18n[editLangTab]?.title ?? ''}
                       onChange={(e) =>
                         setEditI18n({
@@ -1364,11 +1538,12 @@ export function AdminPortalModal({
                           },
                         })
                       }
-                      placeholder={`Título en ${LANGUAGE_LABELS[editLangTab].name} (opcional)`}
+                      placeholder={tx.adminMovieI18nTitlePh(LANGUAGE_LABELS[editLangTab].name)}
                       className="w-full rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-xs text-white"
                     />
                     <textarea
                       rows={2}
+                      aria-label={tx.adminMovieI18nSynopsisPh(LANGUAGE_LABELS[editLangTab].name)}
                       value={editI18n[editLangTab]?.synopsis ?? ''}
                       onChange={(e) =>
                         setEditI18n({
@@ -1379,7 +1554,7 @@ export function AdminPortalModal({
                           },
                         })
                       }
-                      placeholder={`Sinopsis en ${LANGUAGE_LABELS[editLangTab].name} (opcional)`}
+                      placeholder={tx.adminMovieI18nSynopsisPh(LANGUAGE_LABELS[editLangTab].name)}
                       className="w-full rounded-xl border border-white/15 bg-black/45 p-2.5 text-xs text-white"
                     />
                   </div>
@@ -1388,7 +1563,7 @@ export function AdminPortalModal({
                   <div className="rounded-2xl border border-white/10 bg-black/35 p-3.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-slate-200">
-                        Colores de ambiente de esta película
+                        {tx.adminMoviePaletteLabel}
                       </span>
                       <button
                         type="button"
@@ -1396,16 +1571,16 @@ export function AdminPortalModal({
                         onClick={handleExtractEditingPalette}
                         className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-sky-300 hover:bg-white/10 disabled:opacity-40"
                       >
-                        {extractingPalette ? 'Extrayendo…' : 'Extraer del póster'}
+                        {extractingPalette ? tx.adminExtractingBtn : tx.adminExtractPaletteBtn}
                       </button>
                     </div>
 
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
                       {[
-                        { name: 'Espacial', palette: { primary: '#38bdf8', secondary: '#6366f1', accent: '#f59e0b' } },
-                        { name: 'Neón', palette: { primary: '#f43f5e', secondary: '#8b5cf6', accent: '#22d3ee' } },
-                        { name: 'Dorado', palette: { primary: '#f59e0b', secondary: '#ea580c', accent: '#facc15' } },
-                        { name: 'Bosque', palette: { primary: '#10b981', secondary: '#0284c7', accent: '#fbbf24' } },
+                        { name: 'Cosmic', palette: { primary: '#38bdf8', secondary: '#6366f1', accent: '#f59e0b' } },
+                        { name: 'Neon', palette: { primary: '#f43f5e', secondary: '#8b5cf6', accent: '#22d3ee' } },
+                        { name: 'Gold', palette: { primary: '#f59e0b', secondary: '#ea580c', accent: '#facc15' } },
+                        { name: 'Forest', palette: { primary: '#10b981', secondary: '#0284c7', accent: '#fbbf24' } },
                       ].map((preset) => (
                         <button
                           key={preset.name}
@@ -1427,7 +1602,7 @@ export function AdminPortalModal({
                       ))}
                     </div>
 
-                    <div className="mt-3 grid grid-cols-3 gap-3">
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                       {(['primary', 'secondary', 'accent'] as const).map((slot) => (
                         <label key={slot} className="flex items-center gap-2 text-xs">
                           <input
@@ -1446,10 +1621,10 @@ export function AdminPortalModal({
                           />
                           <span className="capitalize text-slate-300">
                             {slot === 'primary'
-                              ? 'Principal'
+                              ? tx.adminPalettePrimary
                               : slot === 'secondary'
-                                ? 'Secundario'
-                                : 'Acento'}
+                                ? tx.adminPaletteSecondary
+                                : tx.adminPaletteAccent}
                           </span>
                         </label>
                       ))}
@@ -1462,13 +1637,13 @@ export function AdminPortalModal({
                       onClick={() => setEditingMovie(null)}
                       className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-slate-300"
                     >
-                      Cancelar
+                      {t.cancelBtn}
                     </button>
                     <button
                       type="submit"
                       className="rounded-xl bg-emerald-400 px-5 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300"
                     >
-                      Guardar ficha
+                      {t.saveMovieBtn}
                     </button>
                   </div>
                 </form>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getReadableTextColor } from '../utils/colorExtractor';
 import {
   buildStudentFingerprint,
   isAllowedSchoolDomain,
@@ -8,12 +9,28 @@ import {
   normalizeNamePart,
   validateVoterForm,
 } from '../utils/normalization';
+import { sanitizeHexColor, sanitizeSafeHttpUrl } from '../utils/urlSafety';
 
 describe('Normalización de identidad y antifraude', () => {
-  it('normaliza correo con trim y minúsculas', () => {
+  it('normaliza correo con trim, minúsculas y elimina alias +tag', () => {
     expect(normalizeEmail('  Lucia.Gomez@IESEjemplo.ES  ')).toBe(
       'lucia.gomez@iesejemplo.es'
     );
+    expect(normalizeEmail('Lucia.Gomez+test99@gmail.com')).toBe(
+      'lucia.gomez@gmail.com'
+    );
+  });
+
+  it('sanitiza URLs peligrosas y calcula contraste legible', () => {
+    expect(sanitizeSafeHttpUrl('javascript:alert(1)')).toBeNull();
+    expect(sanitizeSafeHttpUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(sanitizeSafeHttpUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    );
+    expect(sanitizeHexColor('#38bdf8')).toBe('#38bdf8');
+    expect(sanitizeHexColor('url(evil)', '#6366f1')).toBe('#6366f1');
+    expect(getReadableTextColor('#312e81')).toBe('#ffffff');
+    expect(getReadableTextColor('#facc15')).toBe('#020617');
   });
 
   it('elimina tildes, diacríticos y espacios dobles en nombre y apellidos', () => {

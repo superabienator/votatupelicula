@@ -187,7 +187,7 @@ export function CivicEducationModal({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Cerrar explicación"
+                aria-label={t.closeBtn}
                 className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
@@ -289,7 +289,7 @@ export function CivicEducationModal({
                       key={w.rank}
                       className="rounded-lg border border-white/15 bg-black/35 px-2 py-1 font-mono text-xs font-bold text-amber-300"
                     >
-                      {w.rank}º = {w.points} {w.points === 1 ? t.ptSingular : t.ptPlural}
+                      {t.rankOrdinal(w.rank)} = {w.points} {w.points === 1 ? t.ptSingular : t.ptPlural}
                     </span>
                   ))}
                 </div>
@@ -312,7 +312,11 @@ export function CivicEducationModal({
                   </p>
                 </div>
 
-                <div className="inline-flex rounded-xl border border-white/10 bg-black/40 p-1">
+                <div
+                  role="tablist"
+                  aria-label={t.simTitle}
+                  className="inline-flex flex-wrap rounded-xl border border-white/10 bg-black/40 p-1"
+                >
                   {(
                     [
                       { id: 'fptp', label: t.simTabFptp },
@@ -323,6 +327,8 @@ export function CivicEducationModal({
                     <button
                       key={tab.id}
                       type="button"
+                      role="tab"
+                      aria-selected={simSystem === tab.id}
                       onClick={() => setSimSystem(tab.id)}
                       className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                         simSystem === tab.id
@@ -350,8 +356,8 @@ export function CivicEducationModal({
 
                   return (
                     <div key={movie.id} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-white">{movie.name}</span>
                           <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-slate-300">
                             {movie.tag}

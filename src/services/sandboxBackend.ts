@@ -2,6 +2,7 @@ import type {
   DashboardResults,
   Movie,
   OtpChallenge,
+  PublicStandings,
   VoteReceipt,
   VotingSettings,
 } from '../types/cinema';
@@ -357,13 +358,124 @@ function assertAdmin(secret: string): void {
   }
 }
 
+function buildStandingsAggregate(): PublicStandings {
+  const totalVotes = votes.length;
+
+  const classMap = new Map<string, number>();
+  for (const c of settings.allowed_classes) classMap.set(c, 0);
+  for (const v of votes) {
+    classMap.set(v.curso, (classMap.get(v.curso) ?? 0) + 1);
+  }
+
+  const participationByClass = Array.from(classMap.entries()).map(([curso, count]) => ({
+    curso,
+    count,
+    percentage: totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0,
+  }));
+
+  const activeMovies = movies.filter(
+    (m) => m.status === 'published' || m.status === 'archived'
+  );
+
+  const statsMap = new Map(
+    activeMovies.map((m) => [
+      m.id,
+      {
+        movie_id: m.id,
+        title: m.title,
+        poster_url: m.poster_url,
+        palette: m.palette,
+        year: m.year,
+        status: m.status,
+        total_points: 0,
+        first_choice_votes: 0,
+        top_k_appearances: 0,
+        rank_breakdown: {} as Record<number, number>,
+      },
+    ])
+  );
+
+  let grandTotalPoints = 0;
+  for (const v of votes) {
+    v.rankedMovieIds.slice(0, settings.top_k).forEach((movieId, idx) => {
+      const entry = statsMap.get(movieId);
+      if (!entry) return;
+      const rank = idx + 1;
+      const pts = getBordaPoints(rank, settings.top_k, settings.scoring_mode);
+      entry.total_points = Math.round((entry.total_points + pts) * 100) / 100;
+      grandTotalPoints = Math.round((grandTotalPoints + pts) * 100) / 100;
+      entry.top_k_appearances += 1;
+      if (rank === 1) entry.first_choice_votes += 1;
+      entry.rank_breakdown[rank] = (entry.rank_breakdown[rank] ?? 0) + 1;
+    });
+  }
+
+  const leaderboard = Array.from(statsMap.values())
+    .map((item) => ({
+      ...item,
+      first_choice_pct:
+        totalVotes > 0
+          ? Math.round((item.first_choice_votes / totalVotes) * 1000) / 10
+          : 0,
+      top_k_pct:
+        totalVotes > 0
+          ? Math.round((item.top_k_appearances / totalVotes) * 1000) / 10
+          : 0,
+      borda_share_pct:
+        grandTotalPoints > 0
+          ? Math.round((item.total_points / grandTotalPoints) * 1000) / 10
+          : 0,
+    }))
+    .sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      if (b.first_choice_votes !== a.first_choice_votes) {
+        return b.first_choice_votes - a.first_choice_votes;
+      }
+      return b.top_k_appearances - a.top_k_appearances;
+    });
+
+  const fptpWinner =
+    [...leaderboard].sort((a, b) => b.first_choice_votes - a.first_choice_votes)[0] ??
+    null;
+  const bordaWinner = leaderboard[0] ?? null;
+  const consensusWinner =
+    [...leaderboard].sort((a, b) => b.top_k_appearances - a.top_k_appearances)[0] ??
+    null;
+
+  return {
+    total_votes: totalVotes,
+    grand_total_points: grandTotalPoints,
+    participation_by_class: participationByClass,
+    leaderboard,
+    pedagogical_comparison: {
+      fptp_winner: fptpWinner,
+      borda_winner: bordaWinner,
+      consensus_winner: consensusWinner,
+      diverged: Boolean(
+        bordaWinner && fptpWinner && bordaWinner.movie_id !== fptpWinner.movie_id
+      ),
+    },
+  };
+}
+
+function codedError(message: string, code: string): Error & { code: string } {
+  const err = new Error(message) as Error & { code: string };
+  err.code = code;
+  return err;
+}
+
 export const sandboxBackend = {
-  async getBallotData(): Promise<{ settings: VotingSettings; movies: Movie[] }> {
+  async getBallotData(): Promise<{
+    settings: VotingSettings;
+    movies: Movie[];
+    public_standings: PublicStandings;
+  }> {
     return {
       settings: { ...settings },
       movies: movies
         .filter((m) => m.status === 'published')
         .sort((a, b) => a.display_order - b.display_order),
+      public_standings: buildStandingsAggregate(),
     };
   },
 
@@ -375,11 +487,11 @@ export const sandboxBackend = {
     movie_ids: string[];
   }): Promise<OtpChallenge> {
     if (!settings.voting_open) {
-      throw new Error('La votación está cerrada en este momento.');
+      throw codedError('La votación está cerrada en este momento.', 'VOTING_CLOSED');
     }
 
     if (payload.movie_ids.length !== settings.top_k) {
-      throw new Error(`Debes ordenar exactamente ${settings.top_k} películas.`);
+      throw codedError(`Debes ordenar exactamente ${settings.top_k} películas.`, 'INVALID_MOVIE_COUNT');
     }
 
     const identity = validateVoterForm(
@@ -388,17 +500,18 @@ export const sandboxBackend = {
       settings.allowed_email_domains
     );
     if (!identity.valid || !identity.normalized) {
-      throw new Error(identity.error || 'Datos inválidos.');
+      throw codedError(identity.error || 'Datos inválidos.', identity.errorCode || 'INVALID_IDENTITY');
     }
 
     const { nombre, apellidos, curso, email, huellaAlumno } = identity.normalized;
 
     if (votes.some((v) => v.email === email)) {
-      throw new Error('Ya existe un voto confirmado con este correo electrónico.');
+      throw codedError('Ya existe un voto confirmado con este correo electrónico.', 'DUPLICATE_EMAIL');
     }
     if (votes.some((v) => v.huella_alumno === huellaAlumno)) {
-      throw new Error(
-        'Este alumno o alumna ya ha emitido su voto en este curso (huella duplicada aunque uses otro correo).'
+      throw codedError(
+        'Este alumno o alumna ya ha emitido su voto en este curso (huella duplicada aunque uses otro correo).',
+        'DUPLICATE_STUDENT'
       );
     }
 
@@ -414,8 +527,9 @@ export const sandboxBackend = {
     if (activeRecent) {
       const elapsed = Math.floor((Date.now() - activeRecent.last_sent_at) / 1000);
       if (elapsed < 60) {
-        throw new Error(
-          `Debes esperar ${60 - elapsed} segundos antes de solicitar otro código.`
+        throw codedError(
+          `Debes esperar ${60 - elapsed} segundos antes de solicitar otro código.`,
+          'RATE_LIMITED'
         );
       }
     }
@@ -452,32 +566,33 @@ export const sandboxBackend = {
     code: string;
   }): Promise<Omit<VoteReceipt, 'rankedMovies'>> {
     const token = otpStore.get(payload.challenge_id);
-    if (!token) throw new Error('Solicitud de verificación no encontrada.');
-    if (token.used) throw new Error('Este código ya fue utilizado.');
+    if (!token) throw codedError('Solicitud de verificación no encontrada.', 'OTP_NOT_FOUND');
+    if (token.used) throw codedError('Este código ya fue utilizado.', 'OTP_ALREADY_USED');
     if (Date.now() > token.expires_at) {
-      throw new Error('El código ha caducado (10 min). Solicita uno nuevo.');
+      throw codedError('El código ha caducado (10 min). Solicita uno nuevo.', 'OTP_EXPIRED');
     }
     if (token.attempts >= 3) {
-      throw new Error('Has superado el máximo de 3 intentos. Solicita un código nuevo.');
+      throw codedError('Has superado el máximo de 3 intentos. Solicita un código nuevo.', 'OTP_MAX_ATTEMPTS');
     }
 
     if (token.code !== payload.code.trim()) {
       token.attempts += 1;
       const remaining = Math.max(0, 3 - token.attempts);
-      throw new Error(
+      throw codedError(
         remaining === 0
           ? 'Código incorrecto. Has agotado los 3 intentos; solicita un nuevo código.'
-          : `Código incorrecto. Te quedan ${remaining} intento(s).`
+          : `Código incorrecto. Te quedan ${remaining} intento(s).`,
+        remaining === 0 ? 'OTP_MAX_ATTEMPTS' : 'INVALID_OTP'
       );
     }
 
     if (votes.some((v) => v.email === token.email)) {
       token.used = true;
-      throw new Error('Ya existe un voto confirmado con este correo electrónico.');
+      throw codedError('Ya existe un voto confirmado con este correo electrónico.', 'DUPLICATE_EMAIL');
     }
     if (votes.some((v) => v.huella_alumno === token.huella_alumno)) {
       token.used = true;
-      throw new Error('Este alumno o alumna ya ha emitido su voto en este curso.');
+      throw codedError('Este alumno o alumna ya ha emitido su voto en este curso.', 'DUPLICATE_STUDENT');
     }
 
     const voteId = makeUuid();
@@ -641,92 +756,10 @@ export const sandboxBackend = {
 
   async adminGetResults(secret: string): Promise<DashboardResults> {
     assertAdmin(secret);
-    const totalVotes = votes.length;
-
-    const classMap = new Map<string, number>();
-    for (const c of settings.allowed_classes) classMap.set(c, 0);
-    for (const v of votes) {
-      classMap.set(v.curso, (classMap.get(v.curso) ?? 0) + 1);
-    }
-
-    const participationByClass = Array.from(classMap.entries()).map(([curso, count]) => ({
-      curso,
-      count,
-      percentage: totalVotes > 0 ? Math.round((count / totalVotes) * 1000) / 10 : 0,
-    }));
-
-    const activeMovies = movies.filter(
-      (m) => m.status === 'published' || m.status === 'archived'
-    );
-
-    const statsMap = new Map(
-      activeMovies.map((m) => [
-        m.id,
-        {
-          movie_id: m.id,
-          title: m.title,
-          poster_url: m.poster_url,
-          palette: m.palette,
-          year: m.year,
-          status: m.status,
-          total_points: 0,
-          first_choice_votes: 0,
-          top_k_appearances: 0,
-          rank_breakdown: {} as Record<number, number>,
-        },
-      ])
-    );
-
-    let grandTotalPoints = 0;
-    for (const v of votes) {
-      v.rankedMovieIds.slice(0, settings.top_k).forEach((movieId, idx) => {
-        const entry = statsMap.get(movieId);
-        if (!entry) return;
-        const rank = idx + 1;
-        const pts = getBordaPoints(rank, settings.top_k, settings.scoring_mode);
-        entry.total_points = Math.round((entry.total_points + pts) * 100) / 100;
-        grandTotalPoints = Math.round((grandTotalPoints + pts) * 100) / 100;
-        entry.top_k_appearances += 1;
-        if (rank === 1) entry.first_choice_votes += 1;
-        entry.rank_breakdown[rank] = (entry.rank_breakdown[rank] ?? 0) + 1;
-      });
-    }
-
-    const leaderboard = Array.from(statsMap.values())
-      .map((item) => ({
-        ...item,
-        first_choice_pct:
-          totalVotes > 0
-            ? Math.round((item.first_choice_votes / totalVotes) * 1000) / 10
-            : 0,
-        top_k_pct:
-          totalVotes > 0
-            ? Math.round((item.top_k_appearances / totalVotes) * 1000) / 10
-            : 0,
-        borda_share_pct:
-          grandTotalPoints > 0
-            ? Math.round((item.total_points / grandTotalPoints) * 1000) / 10
-            : 0,
-      }))
-      .sort((a, b) => {
-        if (b.total_points !== a.total_points) return b.total_points - a.total_points;
-        if (b.first_choice_votes !== a.first_choice_votes) {
-          return b.first_choice_votes - a.first_choice_votes;
-        }
-        return b.top_k_appearances - a.top_k_appearances;
-      });
-
-    const fptpWinner =
-      [...leaderboard].sort((a, b) => b.first_choice_votes - a.first_choice_votes)[0] ??
-      null;
-    const bordaWinner = leaderboard[0] ?? null;
-    const consensusWinner =
-      [...leaderboard].sort((a, b) => b.top_k_appearances - a.top_k_appearances)[0] ??
-      null;
-
-    const diverged = Boolean(
-      bordaWinner && fptpWinner && bordaWinner.movie_id !== fptpWinner.movie_id
-    );
+    const agg = buildStandingsAggregate();
+    const { total_votes: totalVotes, leaderboard, pedagogical_comparison } = agg;
+    const { fptp_winner: fptpWinner, borda_winner: bordaWinner, consensus_winner: consensusWinner, diverged } =
+      pedagogical_comparison;
 
     const insightTitle =
       totalVotes === 0
@@ -764,8 +797,8 @@ export const sandboxBackend = {
     return {
       settings: { ...settings },
       total_votes: totalVotes,
-      grand_total_points: grandTotalPoints,
-      participation_by_class: participationByClass,
+      grand_total_points: agg.grand_total_points,
+      participation_by_class: agg.participation_by_class,
       leaderboard,
       votes_log: votesLog,
       pedagogical_comparison: {

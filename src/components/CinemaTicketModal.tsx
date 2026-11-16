@@ -48,7 +48,7 @@ export function CinemaTicketModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="ticket-title"
-            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-[#101424] shadow-[0_30px_80px_rgba(0,0,0,0.85)]"
+            className="relative max-h-[92vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-[0_30px_80px_rgba(0,0,0,0.85)]"
             initial={{ opacity: 0, scale: 0.9, rotateX: 12, y: 24 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 16 }}
@@ -57,31 +57,35 @@ export function CinemaTicketModal({
           >
             {/* Cabecera cinematográfica del ticket */}
             <div
-              className="relative px-6 pb-5 pt-6 text-white"
+              className="relative overflow-hidden px-6 pb-5 pt-6 text-white"
               style={{
                 background: `linear-gradient(135deg, ${leadPalette.primary}dd 0%, ${leadPalette.secondary}cc 100%)`,
               }}
             >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/65 via-slate-950/45 to-slate-950/75"
+              />
               <button
                 type="button"
                 onClick={onBackToEdit}
-                aria-label="Cerrar resumen"
-                className="absolute right-4 top-4 rounded-xl bg-black/30 p-1.5 text-white/90 transition hover:bg-black/50"
+                aria-label={t.closeBtn}
+                className="relative z-10 float-right rounded-xl bg-black/40 p-1.5 text-white transition hover:bg-black/60"
               >
                 <X className="h-4 w-4" />
               </button>
 
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/90">
+              <div className="relative z-10 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/95">
                 <Film className="h-4 w-4" />
                 <span>{t.ticketHeaderTag}</span>
               </div>
               <h2
                 id="ticket-title"
-                className="mt-1.5 font-display text-2xl font-extrabold leading-tight"
+                className="relative z-10 mt-1.5 font-display text-2xl font-extrabold leading-tight"
               >
                 {t.ticketTitle}
               </h2>
-              <p className="mt-0.5 text-xs text-white/85">{campaignTitle}</p>
+              <p className="relative z-10 mt-0.5 text-xs text-white/90">{campaignTitle}</p>
             </div>
 
             {/* Cuerpo de preferencias */}
@@ -167,10 +171,7 @@ export function CinemaTicketModal({
                 <button
                   type="button"
                   onClick={onProceedToAuth}
-                  className="inline-flex flex-[1.5] items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-xs font-extrabold text-slate-950 shadow-lg transition hover:brightness-110"
-                  style={{
-                    background: `linear-gradient(135deg, ${leadPalette.accent}, ${leadPalette.primary})`,
-                  }}
+                  className="inline-flex flex-[1.5] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-sky-300 px-4 py-3 text-xs font-extrabold text-slate-950 shadow-lg transition hover:brightness-105"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {t.ticketProceedAuth}

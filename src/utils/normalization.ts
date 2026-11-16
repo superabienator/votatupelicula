@@ -243,7 +243,14 @@ const RFC5322_DOMAIN_REGEX =
   /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
 export function normalizeEmail(raw: string): string {
-  return raw.trim().toLowerCase();
+  const clean = raw.trim().toLowerCase();
+  const atIndex = clean.indexOf('@');
+  if (atIndex <= 0) return clean;
+  const local = clean.slice(0, atIndex);
+  const domain = clean.slice(atIndex + 1);
+  const plusIndex = local.indexOf('+');
+  const baseLocal = plusIndex > 0 ? local.slice(0, plusIndex) : local;
+  return `${baseLocal}@${domain}`;
 }
 
 export function stripAccents(raw: string): string {
@@ -251,7 +258,7 @@ export function stripAccents(raw: string): string {
 }
 
 export function normalizeNamePart(raw: string): string {
-  return stripAccents(raw).toLowerCase().trim().replace(/\s+/g, ' ');
+  return stripAccents(raw).replace(/[\r\n]+/g, ' ').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
 export function buildStudentFingerprint(
@@ -304,37 +311,64 @@ export function isAllowedSchoolDomain(
   });
 }
 
+export type VoterValidationErrorCode =
+  | 'INVALID_FIRST_NAME'
+  | 'INVALID_LAST_NAME'
+  | 'INVALID_NAME_CHARS'
+  | 'INVALID_CLASS'
+  | 'INVALID_EMAIL_FORMAT'
+  | 'DISPOSABLE_EMAIL'
+  | 'DOMAIN_NOT_ALLOWED';
+
 export function validateVoterForm(
   form: { nombre: string; apellidos: string; curso: string; email: string },
   allowedClasses: string[],
   allowedDomains: string[]
-): { valid: boolean; error?: string; normalized?: { nombre: string; apellidos: string; curso: string; email: string; huellaAlumno: string } } {
+): {
+  valid: boolean;
+  error?: string;
+  errorCode?: VoterValidationErrorCode;
+  normalized?: { nombre: string; apellidos: string; curso: string; email: string; huellaAlumno: string };
+} {
   const nombre = normalizeNamePart(form.nombre || '');
   const apellidos = normalizeNamePart(form.apellidos || '');
   const curso = (form.curso || '').trim();
   const email = normalizeEmail(form.email || '');
 
   if (nombre.length < 2 || nombre.length > 80) {
-    return { valid: false, error: 'Introduce tu nombre real (al menos 2 letras).' };
+    return { valid: false, errorCode: 'INVALID_FIRST_NAME', error: 'Introduce tu nombre real (al menos 2 letras).' };
   }
   if (apellidos.length < 2 || apellidos.length > 100) {
-    return { valid: false, error: 'Introduce tus apellidos reales (al menos 2 letras).' };
+    return { valid: false, errorCode: 'INVALID_LAST_NAME', error: 'Introduce tus apellidos reales (al menos 2 letras).' };
   }
   if (!/^[\p{L}\s'-]+$/u.test(form.nombre.trim()) || !/^[\p{L}\s'-]+$/u.test(form.apellidos.trim())) {
-    return { valid: false, error: 'Nombre y apellidos solo deben incluir letras, espacios o guiones.' };
+    return {
+      valid: false,
+      errorCode: 'INVALID_NAME_CHARS',
+      error: 'Nombre y apellidos solo deben incluir letras, espacios o guiones.',
+    };
   }
   if (!allowedClasses.includes(curso)) {
-    return { valid: false, error: 'Selecciona tu Curso / Grupo de la lista.' };
+    return { valid: false, errorCode: 'INVALID_CLASS', error: 'Selecciona tu Curso / Grupo de la lista.' };
   }
   if (!isValidRfc5322Email(email)) {
-    return { valid: false, error: 'El formato del correo electrónico no es válido (RFC 5322).' };
+    return {
+      valid: false,
+      errorCode: 'INVALID_EMAIL_FORMAT',
+      error: 'El formato del correo electrónico no es válido (RFC 5322).',
+    };
   }
   if (isDisposableEmail(email)) {
-    return { valid: false, error: 'No se permiten dominios de correo temporal o desechable.' };
+    return {
+      valid: false,
+      errorCode: 'DISPOSABLE_EMAIL',
+      error: 'No se permiten dominios de correo temporal o desechable.',
+    };
   }
   if (!isAllowedSchoolDomain(email, allowedDomains)) {
     return {
       valid: false,
+      errorCode: 'DOMAIN_NOT_ALLOWED',
       error: `Este centro solo permite correos de: ${allowedDomains.join(', ')}.`,
     };
   }

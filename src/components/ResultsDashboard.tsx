@@ -4,21 +4,27 @@ import {
   BarChart3,
   Crown,
   Edit3,
+  Eye,
+  EyeOff,
   GraduationCap,
   Medal,
   RefreshCw,
   RotateCcw,
   Scale,
   Search,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Trophy,
   Users,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
+import { getLocalizedMovie } from '../i18n/translations';
 import type { DashboardResults, Movie, VoteLogEntry } from '../types/cinema';
 import { hexToRgba } from '../utils/colorExtractor';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 
 interface ResultsDashboardProps {
@@ -32,6 +38,24 @@ interface ResultsDashboardProps {
     voteId: string,
     patch: { curso?: string; ranked_movie_ids?: string[] }
   ) => Promise<void>;
+  onSubModalOpenChange?: (open: boolean) => void;
+}
+
+function maskNamePart(value: string): string {
+  const clean = value.trim();
+  if (!clean) return '***';
+  return clean
+    .split(/\s+/)
+    .map((w) => (w.length <= 1 ? '*' : `${w[0]}${'*'.repeat(Math.min(4, w.length - 1))}`))
+    .join(' ');
+}
+
+function maskEmailAddress(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const [local, domain] = parts;
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***@${domain}`;
 }
 
 export function ResultsDashboard({
@@ -42,17 +66,38 @@ export function ResultsDashboard({
   onResetVotes,
   onDeleteVote,
   onUpdateVote,
+  onSubModalOpenChange,
 }: ResultsDashboardProps) {
+  const { lang, t } = useI18n();
+  const tx = t.adminExtra;
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmDeleteVoteId, setConfirmDeleteVoteId] = useState<string | null>(null);
   const [voteSearch, setVoteSearch] = useState('');
+  const [showIdentities, setShowIdentities] = useState(false);
   const [editingVote, setEditingVote] = useState<VoteLogEntry | null>(null);
   const [editCurso, setEditCurso] = useState('');
   const [editMovieIds, setEditMovieIds] = useState<string[]>([]);
   const [voteEditError, setVoteEditError] = useState<string | null>(null);
+
+  const hasSubModal = Boolean(confirmResetOpen || editingVote || confirmDeleteVoteId);
+  useEffect(() => {
+    onSubModalOpenChange?.(hasSubModal);
+  }, [hasSubModal, onSubModalOpenChange]);
+
+  useEscapeKey(confirmResetOpen, () => setConfirmResetOpen(false));
+  useEscapeKey(Boolean(confirmDeleteVoteId), () => setConfirmDeleteVoteId(null));
+  useEscapeKey(Boolean(editingVote), () => setEditingVote(null));
+
+  const movieById = new Map(movies.map((m) => [m.id, m]));
+  const resolveTitle = (movieId: string, fallbackTitle: string) => {
+    const m = movieById.get(movieId);
+    return m ? getLocalizedMovie(m, lang).title : fallbackTitle;
+  };
+
   if (!results) {
     return (
       <div className="flex min-h-[260px] items-center justify-center rounded-3xl border border-white/10 bg-white/[0.02] p-8 text-sm text-slate-400">
-        {loading ? 'Calculando escrutinio Borda y métricas de consenso…' : 'Sin datos disponibles.'}
+        {loading ? tx.resultsCalcLoading : tx.resultsNoData}
       </div>
     );
   }
@@ -69,7 +114,6 @@ export function ResultsDashboard({
   const maxPoints = Math.max(1, ...leaderboard.map((l) => l.total_points));
   const maxClassVotes = Math.max(1, ...participation_by_class.map((c) => c.count));
 
-  // Orden visual clásico de podio: [2º, 1º, 3º]
   const podiumOrder = [
     leaderboard[1] ? { rank: 2, item: leaderboard[1], height: 'h-36 sm:h-40', delay: 0.15 } : null,
     leaderboard[0] ? { rank: 1, item: leaderboard[0], height: 'h-44 sm:h-52', delay: 0.05 } : null,
@@ -87,10 +131,10 @@ export function ResultsDashboard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-xl font-extrabold text-white">
-            Escrutinio en Directo & Análisis Cívico
+            {tx.resultsTitle}
           </h3>
           <p className="text-xs text-slate-400">
-            Recuento ponderado TOP {settings.top_k} ({settings.scoring_mode === 'classic' ? 'Borda Clásico' : 'Borda Fraccional'})
+            {tx.resultsSubtitle(settings.top_k, settings.scoring_mode === 'classic')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -101,7 +145,7 @@ export function ResultsDashboard({
             className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-white/10 disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar escrutinio
+            {loading ? t.standingsRefreshing : tx.resultsRefreshBtn}
           </button>
 
           <button
@@ -111,7 +155,7 @@ export function ResultsDashboard({
             className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/35 bg-rose-500/15 px-3.5 py-2 text-xs font-bold text-rose-200 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            Vaciar urna a cero
+            {tx.resultsResetBtn}
           </button>
         </div>
       </div>
@@ -120,29 +164,29 @@ export function ResultsDashboard({
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Votos válidos verificados</span>
+            <span>{tx.resultsTotalVotesLabel}</span>
             <Users className="h-4 w-4 text-sky-400" />
           </div>
           <p className="mt-2 font-mono text-3xl font-extrabold text-white">{total_votes}</p>
-          <p className="mt-0.5 text-[11px] text-slate-400">100% autenticados con OTP</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{tx.resultsOtpVerified}</p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Puntos Borda repartidos</span>
+            <span>{tx.resultsBordaPointsLabel}</span>
             <Trophy className="h-4 w-4 text-amber-400" />
           </div>
           <p className="mt-2 font-mono text-3xl font-extrabold text-white">
             {grand_total_points}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            {leaderboard.length} películas en cartelera
+            {tx.resultsMoviesCount(leaderboard.length)}
           </p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Consenso de la ganadora</span>
+            <span>{tx.resultsLeaderConsensusLabel}</span>
             <Scale className="h-4 w-4 text-emerald-400" />
           </div>
           <p className="mt-2 font-mono text-3xl font-extrabold text-emerald-300">
@@ -151,7 +195,7 @@ export function ResultsDashboard({
               : '0%'}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            Presente en el TOP {settings.top_k} del alumnado
+            {tx.resultsTopKPresence(settings.top_k)}
           </p>
         </div>
       </div>
@@ -162,101 +206,104 @@ export function ResultsDashboard({
           <div className="mb-6 flex items-center gap-2">
             <Crown className="h-5 w-5 text-amber-400" />
             <h4 className="font-display text-lg font-bold text-white">
-              Podio de Cartelera
+              {tx.resultsPodiumTitle}
             </h4>
           </div>
 
           <div className="grid grid-cols-3 items-end gap-2 sm:gap-5">
-            {podiumOrder.map(({ rank, item, height, delay }) => (
-              <motion.div
-                key={item.movie_id}
-                initial={{ opacity: 0, y: 28 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay, type: 'spring', stiffness: 180, damping: 18 }}
-                className="flex flex-col items-center text-center"
-              >
-                <div className="relative mb-3">
-                  <div
-                    className="h-24 w-16 overflow-hidden rounded-xl border-2 shadow-xl sm:h-32 sm:w-24"
-                    style={{
-                      borderColor:
-                        rank === 1
-                          ? '#fbbf24'
-                          : rank === 2
-                            ? '#cbd5e1'
-                            : '#fb923c',
-                    }}
-                  >
-                    <MoviePoster
-                      title={item.title}
-                      posterUrl={item.poster_url}
-                      palette={item.palette}
-                      compact
-                      className="h-full w-full"
-                    />
-                  </div>
-                  <span
-                    className={`absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs font-extrabold shadow-lg ${
-                      rank === 1
-                        ? 'bg-amber-400 text-slate-950'
-                        : rank === 2
-                          ? 'bg-slate-200 text-slate-950'
-                          : 'bg-orange-400 text-slate-950'
-                    }`}
-                  >
-                    {rank}º
-                  </span>
-                </div>
-
-                <p className="line-clamp-2 font-display text-xs font-bold text-white sm:text-sm">
-                  {item.title}
-                </p>
-
+            {podiumOrder.map(({ rank, item, height, delay }) => {
+              const title = resolveTitle(item.movie_id, item.title);
+              return (
                 <motion.div
-                  initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ delay: delay + 0.1, duration: 0.45 }}
-                  style={{
-                    originY: 1,
-                    background: `linear-gradient(180deg, ${hexToRgba(item.palette.primary, 0.55)} 0%, rgba(15,23,42,0.9) 100%)`,
-                    borderColor: hexToRgba(item.palette.primary, 0.65),
-                  }}
-                  className={`mt-2 flex w-full flex-col items-center justify-center rounded-t-2xl border-x border-t px-2 py-3 ${height}`}
+                  key={item.movie_id}
+                  initial={{ opacity: 0, y: 28 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay, type: 'spring', stiffness: 180, damping: 18 }}
+                  className="flex flex-col items-center text-center"
                 >
-                  <Medal
-                    className={`h-5 w-5 ${
-                      rank === 1
-                        ? 'text-amber-300'
-                        : rank === 2
-                          ? 'text-slate-200'
-                          : 'text-orange-300'
-                    }`}
-                  />
-                  <span className="mt-1 font-mono text-base font-extrabold text-white sm:text-xl">
-                    {item.total_points} pts
-                  </span>
-                  <span className="text-[10px] text-slate-300 sm:text-xs">
-                    {item.borda_share_pct}% del total
-                  </span>
+                  <div className="relative mb-3">
+                    <div
+                      className="h-24 w-16 overflow-hidden rounded-xl border-2 shadow-xl sm:h-32 sm:w-24"
+                      style={{
+                        borderColor:
+                          rank === 1
+                            ? '#fbbf24'
+                            : rank === 2
+                              ? '#cbd5e1'
+                              : '#fb923c',
+                      }}
+                    >
+                      <MoviePoster
+                        title={title}
+                        posterUrl={item.poster_url}
+                        palette={item.palette}
+                        compact
+                        className="h-full w-full"
+                      />
+                    </div>
+                    <span
+                      className={`absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs font-extrabold shadow-lg ${
+                        rank === 1
+                          ? 'bg-amber-400 text-slate-950'
+                          : rank === 2
+                            ? 'bg-slate-200 text-slate-950'
+                            : 'bg-orange-400 text-slate-950'
+                      }`}
+                    >
+                      {t.rankOrdinal(rank)}
+                    </span>
+                  </div>
+
+                  <p className="line-clamp-2 font-display text-xs font-bold text-white sm:text-sm">
+                    {title}
+                  </p>
+
+                  <motion.div
+                    initial={{ scaleY: 0 }}
+                    animate={{ scaleY: 1 }}
+                    transition={{ delay: delay + 0.1, duration: 0.45 }}
+                    style={{
+                      originY: 1,
+                      background: `linear-gradient(180deg, ${hexToRgba(item.palette.primary, 0.55)} 0%, rgba(15,23,42,0.9) 100%)`,
+                      borderColor: hexToRgba(item.palette.primary, 0.65),
+                    }}
+                    className={`mt-2 flex w-full flex-col items-center justify-center rounded-t-2xl border-x border-t px-2 py-3 ${height}`}
+                  >
+                    <Medal
+                      className={`h-5 w-5 ${
+                        rank === 1
+                          ? 'text-amber-300'
+                          : rank === 2
+                            ? 'text-slate-200'
+                            : 'text-orange-300'
+                      }`}
+                    />
+                    <span className="mt-1 font-mono text-base font-extrabold text-white sm:text-xl">
+                      {item.total_points} {item.total_points === 1 ? t.ptSingular : t.ptPlural}
+                    </span>
+                    <span className="text-[10px] text-slate-300 sm:text-xs">
+                      {tx.resultsPercentOfTotal(item.borda_share_pct)}
+                    </span>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
 
       {/* 2. DESGLOSE DE CONSENSO PEDAGÓGICO (1ª opción vs TOP K) */}
-      <section className="rounded-3xl border border-white/15 bg-[#0a0e1a] p-5 sm:p-6">
+      <section className="rounded-3xl border border-white/15 bg-[#10162c] p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-sky-400" />
             <h4 className="font-display text-lg font-bold text-white">
-              Desglose de Consenso Pedagógico
+              {tx.resultsPedagogicalTitle}
             </h4>
           </div>
           {pedagogical_comparison.diverged && (
             <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
-              ¡Divergencia detectada entre sistemas!
+              {tx.resultsDivergenceBadge}
             </span>
           )}
         </div>
@@ -277,17 +324,20 @@ export function ResultsDashboard({
           </p>
         </div>
 
-        {/* Comparativa gráfica 1ª Opción vs Presencia en TOP 3 */}
+        {/* Comparativa gráfica 1ª Opción vs Presencia en TOP */}
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-rose-400/25 bg-rose-950/15 p-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-rose-300">
-              Si solo contase la 1ª opción (Mayoría Simple)
+              {tx.resultsFptpCardLabel}
             </p>
             {pedagogical_comparison.fptp_winner ? (
               <div className="mt-3 flex items-center gap-3">
                 <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg border border-white/15">
                   <MoviePoster
-                    title={pedagogical_comparison.fptp_winner.title}
+                    title={resolveTitle(
+                      pedagogical_comparison.fptp_winner.movie_id,
+                      pedagogical_comparison.fptp_winner.title
+                    )}
                     posterUrl={pedagogical_comparison.fptp_winner.poster_url}
                     palette={pedagogical_comparison.fptp_winner.palette}
                     compact
@@ -296,32 +346,42 @@ export function ResultsDashboard({
                 </div>
                 <div>
                   <p className="font-display font-bold text-white">
-                    {pedagogical_comparison.fptp_winner.title}
+                    {resolveTitle(
+                      pedagogical_comparison.fptp_winner.movie_id,
+                      pedagogical_comparison.fptp_winner.title
+                    )}
                   </p>
                   <p className="font-mono text-xs text-rose-200">
-                    {pedagogical_comparison.fptp_winner.first_choice_votes} votos #1 (
-                    {pedagogical_comparison.fptp_winner.first_choice_pct}%)
+                    {tx.resultsFirstChoiceVotes(
+                      pedagogical_comparison.fptp_winner.first_choice_votes,
+                      pedagogical_comparison.fptp_winner.first_choice_pct
+                    )}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Presencia en TOP {settings.top_k}:{' '}
-                    {pedagogical_comparison.fptp_winner.top_k_pct}%
+                    {tx.resultsPresenceInTop(
+                      settings.top_k,
+                      pedagogical_comparison.fptp_winner.top_k_pct
+                    )}
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="mt-2 text-xs text-slate-400">Sin datos</p>
+              <p className="mt-2 text-xs text-slate-400">{tx.resultsNoDataShort}</p>
             )}
           </div>
 
           <div className="rounded-2xl border border-emerald-400/35 bg-emerald-950/15 p-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-              Con Voto Preferencial Borda (Consenso TOP {settings.top_k})
+              {tx.resultsBordaCardLabel(settings.top_k)}
             </p>
             {pedagogical_comparison.borda_winner ? (
               <div className="mt-3 flex items-center gap-3">
                 <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg border border-white/15">
                   <MoviePoster
-                    title={pedagogical_comparison.borda_winner.title}
+                    title={resolveTitle(
+                      pedagogical_comparison.borda_winner.movie_id,
+                      pedagogical_comparison.borda_winner.title
+                    )}
                     posterUrl={pedagogical_comparison.borda_winner.poster_url}
                     palette={pedagogical_comparison.borda_winner.palette}
                     compact
@@ -330,21 +390,28 @@ export function ResultsDashboard({
                 </div>
                 <div>
                   <p className="font-display font-bold text-white">
-                    {pedagogical_comparison.borda_winner.title}
+                    {resolveTitle(
+                      pedagogical_comparison.borda_winner.movie_id,
+                      pedagogical_comparison.borda_winner.title
+                    )}
                   </p>
                   <p className="font-mono text-xs text-emerald-200">
-                    {pedagogical_comparison.borda_winner.total_points} pts · en TOP{' '}
-                    {settings.top_k} del {pedagogical_comparison.borda_winner.top_k_pct}%
+                    {tx.resultsBordaWinnerStats(
+                      pedagogical_comparison.borda_winner.total_points,
+                      settings.top_k,
+                      pedagogical_comparison.borda_winner.top_k_pct
+                    )}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Votos como 1ª opción:{' '}
-                    {pedagogical_comparison.borda_winner.first_choice_votes} (
-                    {pedagogical_comparison.borda_winner.first_choice_pct}%)
+                    {tx.resultsVotesAsFirst(
+                      pedagogical_comparison.borda_winner.first_choice_votes,
+                      pedagogical_comparison.borda_winner.first_choice_pct
+                    )}
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="mt-2 text-xs text-slate-400">Sin datos</p>
+              <p className="mt-2 text-xs text-slate-400">{tx.resultsNoDataShort}</p>
             )}
           </div>
         </div>
@@ -353,20 +420,24 @@ export function ResultsDashboard({
         <div className="mt-5 space-y-3">
           <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-300">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />% votos como 1ª opción
+              <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+              {tx.resultsLegendFirst}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />% alumnos que la
-              incluyen en su TOP {settings.top_k} (consenso)
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              {tx.resultsLegendTopK(settings.top_k)}
             </span>
           </div>
 
           {leaderboard.map((item) => (
             <div key={`cmp-${item.movie_id}`} className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-white">{item.title}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-white">
+                  {resolveTitle(item.movie_id, item.title)}
+                </span>
                 <span className="font-mono text-[11px] text-slate-400">
-                  1ª: {item.first_choice_pct}% · TOP {settings.top_k}: {item.top_k_pct}%
+                  {t.rankOrdinal(1)}: {item.first_choice_pct}% · TOP {settings.top_k}:{' '}
+                  {item.top_k_pct}%
                 </span>
               </div>
               <div className="space-y-1">
@@ -394,12 +465,11 @@ export function ResultsDashboard({
 
       {/* 3. PUNTUACIONES PONDERADAS + PARTICIPACIÓN POR CURSO */}
       <div className="grid gap-5 lg:grid-cols-2">
-        {/* Gráfico de puntuaciones ponderadas */}
         <section className="rounded-3xl border border-white/15 bg-white/[0.02] p-5">
           <div className="mb-4 flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-amber-400" />
             <h4 className="font-display text-base font-bold text-white">
-              Puntuación Borda Ponderada
+              {tx.resultsWeightedTitle}
             </h4>
           </div>
           <div className="space-y-3.5">
@@ -407,12 +477,13 @@ export function ResultsDashboard({
               const widthPct = Math.round((item.total_points / maxPoints) * 100);
               return (
                 <div key={item.movie_id} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="truncate font-semibold text-white">
-                      {idx + 1}. {item.title}
+                      {idx + 1}. {resolveTitle(item.movie_id, item.title)}
                     </span>
-                    <span className="ml-2 shrink-0 font-mono font-bold text-amber-300">
-                      {item.total_points} pts
+                    <span className="shrink-0 font-mono font-bold text-amber-300">
+                      {item.total_points}{' '}
+                      {item.total_points === 1 ? t.ptSingular : t.ptPlural}
                     </span>
                   </div>
                   <div className="h-3.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -429,7 +500,7 @@ export function ResultsDashboard({
                   <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
                     {Array.from({ length: settings.top_k }, (_, i) => i + 1).map((pos) => (
                       <span key={pos} className="font-mono">
-                        {pos}ª: {item.rank_breakdown[pos] ?? 0}
+                        {t.rankOrdinal(pos)}: {item.rank_breakdown[pos] ?? 0}
                       </span>
                     ))}
                   </div>
@@ -439,12 +510,11 @@ export function ResultsDashboard({
           </div>
         </section>
 
-        {/* Participación por Curso / Grupo */}
         <section className="rounded-3xl border border-white/15 bg-white/[0.02] p-5">
           <div className="mb-4 flex items-center gap-2">
             <GraduationCap className="h-5 w-5 text-sky-400" />
             <h4 className="font-display text-base font-bold text-white">
-              Participación por Curso / Grupo
+              {tx.resultsClassTitle}
             </h4>
           </div>
           <div className="space-y-3">
@@ -452,10 +522,10 @@ export function ResultsDashboard({
               const barPct = Math.round((cls.count / maxClassVotes) * 100);
               return (
                 <div key={cls.curso} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="font-semibold text-slate-200">{cls.curso}</span>
                     <span className="font-mono text-slate-300">
-                      {cls.count} {cls.count === 1 ? 'voto' : 'votos'} ({cls.percentage}%)
+                      {t.standingsVotesLabel(cls.count)} ({cls.percentage}%)
                     </span>
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -478,28 +548,48 @@ export function ResultsDashboard({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h4 className="font-display text-base font-bold text-white">
-              Votos registrados ({results.votes_log?.length ?? 0})
+              {tx.resultsVotesLogTitle(results.votes_log?.length ?? 0)}
             </h4>
-            <p className="text-xs text-slate-400">
-              Si un alumno se equivocó al elegir su curso o quieres anular un voto de prueba,
-              puedes editarlo o eliminarlo aquí.
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-300">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              {showIdentities ? t.identitiesMaskedNotice : t.maskedSearchHint}
             </p>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="search"
-              value={voteSearch}
-              onChange={(e) => setVoteSearch(e.target.value)}
-              placeholder="Buscar alumno o curso…"
-              className="w-full rounded-xl border border-white/15 bg-black/40 py-2 pl-8 pr-3 text-xs text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowIdentities((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10"
+            >
+              {showIdentities ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5 text-amber-300" />
+                  {t.hideIdentitiesBtn}
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5 text-sky-300" />
+                  {t.showIdentitiesBtn}
+                </>
+              )}
+            </button>
+            <div className="relative w-full sm:w-60">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="search"
+                aria-label={tx.resultsSearchAria}
+                value={voteSearch}
+                onChange={(e) => setVoteSearch(e.target.value)}
+                placeholder={showIdentities ? tx.resultsSearchPh : tx.resultsSearchMaskedPh}
+                className="w-full rounded-xl border border-white/15 bg-black/40 py-2 pl-8 pr-3 text-xs text-white placeholder:text-slate-400 focus:border-sky-400"
+              />
+            </div>
           </div>
         </div>
 
         {!results.votes_log || results.votes_log.length === 0 ? (
           <p className="py-8 text-center text-xs text-slate-400">
-            La urna está vacía (0 votos).
+            {tx.resultsEmptyBallotBox}
           </p>
         ) : (
           <div className="mt-4 space-y-2.5">
@@ -507,10 +597,16 @@ export function ResultsDashboard({
               .filter((v) => {
                 const q = voteSearch.trim().toLowerCase();
                 if (!q) return true;
+                const matchPublicFields =
+                  v.curso.toLowerCase().includes(q) ||
+                  v.choices.some((ch) =>
+                    resolveTitle(ch.movie_id, ch.title).toLowerCase().includes(q)
+                  );
+                if (!showIdentities) return matchPublicFields;
                 return (
+                  matchPublicFields ||
                   v.nombre.toLowerCase().includes(q) ||
                   v.apellidos.toLowerCase().includes(q) ||
-                  v.curso.toLowerCase().includes(q) ||
                   v.email.toLowerCase().includes(q)
                 );
               })
@@ -522,13 +618,15 @@ export function ResultsDashboard({
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display text-sm font-bold capitalize text-white">
-                        {vote.nombre} {vote.apellidos}
+                        {showIdentities
+                          ? `${vote.nombre} ${vote.apellidos}`
+                          : `${maskNamePart(vote.nombre)} ${maskNamePart(vote.apellidos)}`}
                       </span>
                       <span className="rounded-lg bg-sky-500/20 px-2 py-0.5 text-[11px] font-bold text-sky-300">
                         {vote.curso}
                       </span>
                       <span className="font-mono text-[11px] text-slate-400">
-                        {vote.email}
+                        {showIdentities ? vote.email : maskEmailAddress(vote.email)}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-300">
@@ -537,8 +635,10 @@ export function ResultsDashboard({
                           key={ch.rank_position}
                           className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5"
                         >
-                          <strong className="text-amber-300">{ch.rank_position}º</strong>{' '}
-                          {ch.title}
+                          <strong className="text-amber-300">
+                            {t.rankOrdinal(ch.rank_position)}
+                          </strong>{' '}
+                          {resolveTitle(ch.movie_id, ch.title)}
                         </span>
                       ))}
                     </div>
@@ -556,16 +656,38 @@ export function ResultsDashboard({
                       className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/10"
                     >
                       <Edit3 className="h-3.5 w-3.5 text-sky-300" />
-                      Modificar
+                      {tx.resultsEditVoteBtn}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteVote(vote.id)}
-                      className="inline-flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-200 hover:bg-rose-500/20"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Anular
-                    </button>
+                    {confirmDeleteVoteId === vote.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setConfirmDeleteVoteId(null);
+                            await onDeleteVote(vote.id);
+                          }}
+                          className="rounded-xl bg-rose-600 px-2.5 py-1.5 text-xs font-extrabold text-white hover:bg-rose-500"
+                        >
+                          {tx.resultsDeleteVoteBtn}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteVoteId(null)}
+                          className="rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-white/10"
+                        >
+                          {t.cancelBtn}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteVoteId(vote.id)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-200 hover:bg-rose-500/20"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {tx.resultsDeleteVoteBtn}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -575,20 +697,27 @@ export function ResultsDashboard({
 
       {/* Modal de confirmación para Vaciar Urna a cero */}
       {confirmResetOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-4 rounded-3xl border border-rose-500/40 bg-[#120e16] p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setConfirmResetOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-ballot-title"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto overscroll-contain rounded-3xl border border-rose-500/40 bg-[#181224] p-6 shadow-2xl"
+          >
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-400">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-300">
                 <AlertTriangle className="h-5 w-5" />
               </span>
               <div>
-                <h4 className="font-display text-lg font-extrabold text-white">
-                  ¿Vaciar toda la urna a cero?
+                <h4 id="reset-ballot-title" className="font-display text-lg font-extrabold text-white">
+                  {tx.resultsConfirmResetTitle}
                 </h4>
                 <p className="mt-1 text-xs leading-relaxed text-slate-300">
-                  Se borrarán los <strong>{total_votes} votos</strong> y los códigos OTP
-                  temporales para que puedas empezar una votación limpia desde 0.{' '}
-                  <strong>Tus películas y ajustes NO se borrarán.</strong>
+                  {tx.resultsConfirmResetBody(total_votes)}
                 </p>
               </div>
             </div>
@@ -599,7 +728,7 @@ export function ResultsDashboard({
                 onClick={() => setConfirmResetOpen(false)}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-white/10"
               >
-                Cancelar
+                {t.cancelBtn}
               </button>
               <button
                 type="button"
@@ -607,9 +736,9 @@ export function ResultsDashboard({
                   setConfirmResetOpen(false);
                   await onResetVotes();
                 }}
-                className="rounded-xl bg-rose-500 px-4 py-2 text-xs font-extrabold text-white hover:bg-rose-400"
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-rose-500"
               >
-                Sí, vaciar urna a cero
+                {tx.resultsConfirmResetBtn}
               </button>
             </div>
           </div>
@@ -618,12 +747,19 @@ export function ResultsDashboard({
 
       {/* Modal gráfico para modificar un voto concreto */}
       {editingVote && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setEditingVote(null)}
+        >
           <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-vote-title"
+            onClick={(e) => e.stopPropagation()}
             onSubmit={async (e) => {
               e.preventDefault();
               if (new Set(editMovieIds).size !== editMovieIds.length) {
-                setVoteEditError('No puedes repetir la misma película en dos puestos.');
+                setVoteEditError(tx.resultsDuplicateMovieErr);
                 return;
               }
               setVoteEditError(null);
@@ -633,26 +769,35 @@ export function ResultsDashboard({
               });
               setEditingVote(null);
             }}
-            className="w-full max-w-md space-y-4 rounded-3xl border border-white/20 bg-[#101526] p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] p-6 shadow-2xl"
           >
             <div className="flex items-center justify-between">
-              <h4 className="font-display text-lg font-bold capitalize text-white">
-                Modificar voto de {editingVote.nombre} {editingVote.apellidos}
+              <h4 id="edit-vote-title" className="font-display text-lg font-bold capitalize text-white">
+                {tx.resultsEditVoteModalTitle(
+                  showIdentities
+                    ? `${editingVote.nombre} ${editingVote.apellidos}`
+                    : `${maskNamePart(editingVote.nombre)} ${maskNamePart(editingVote.apellidos)}`
+                )}
               </h4>
               <button
                 type="button"
+                aria-label={t.closeBtn}
                 onClick={() => setEditingVote(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-300">
-                Curso / Grupo
+              <label
+                htmlFor="edit-vote-curso"
+                className="mb-1 block text-xs font-semibold text-slate-300"
+              >
+                {tx.resultsCourseLabel}
               </label>
               <select
+                id="edit-vote-curso"
                 value={editCurso}
                 onChange={(e) => setEditCurso(e.target.value)}
                 className="w-full rounded-xl border border-white/15 bg-[#090c16] px-3 py-2 text-sm text-white"
@@ -667,14 +812,18 @@ export function ResultsDashboard({
 
             <div className="space-y-2.5">
               <p className="text-xs font-semibold text-slate-300">
-                Orden de películas elegido:
+                {tx.resultsChosenOrderLabel}
               </p>
               {editMovieIds.map((movieId, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="w-8 font-mono text-xs font-bold text-amber-300">
-                    {idx + 1}º
-                  </span>
+                  <label
+                    htmlFor={`edit-vote-movie-${idx}`}
+                    className="w-10 font-mono text-xs font-bold text-amber-300"
+                  >
+                    {t.rankOrdinal(idx + 1)}
+                  </label>
                   <select
+                    id={`edit-vote-movie-${idx}`}
                     value={movieId}
                     onChange={(e) => {
                       const next = [...editMovieIds];
@@ -687,7 +836,7 @@ export function ResultsDashboard({
                       .filter((m) => m.status === 'published' || m.id === movieId)
                       .map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.title}
+                          {getLocalizedMovie(m, lang).title}
                         </option>
                       ))}
                   </select>
@@ -696,7 +845,10 @@ export function ResultsDashboard({
             </div>
 
             {voteEditError && (
-              <p className="rounded-xl border border-rose-500/40 bg-rose-500/15 p-2.5 text-xs text-rose-200">
+              <p
+                role="alert"
+                className="rounded-xl border border-rose-500/40 bg-rose-500/15 p-2.5 text-xs text-rose-200"
+              >
                 {voteEditError}
               </p>
             )}
@@ -707,13 +859,13 @@ export function ResultsDashboard({
                 onClick={() => setEditingVote(null)}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-slate-300"
               >
-                Cancelar
+                {t.cancelBtn}
               </button>
               <button
                 type="submit"
                 className="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300"
               >
-                Guardar cambios
+                {tx.resultsSaveVoteChangesBtn}
               </button>
             </div>
           </form>

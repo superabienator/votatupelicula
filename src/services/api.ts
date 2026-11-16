@@ -2,6 +2,7 @@ import type {
   DashboardResults,
   Movie,
   OtpChallenge,
+  PublicStandings,
   VoteReceipt,
   VotingSettings,
 } from '../types/cinema';
@@ -38,20 +39,35 @@ async function callEdgeFunction<T>(
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || `Error de servidor (${res.status})`);
+    const err = new Error(data?.error || `Error de servidor (${res.status})`) as Error & {
+      code?: string;
+    };
+    if (typeof data?.error_code === 'string') {
+      err.code = data.error_code;
+    }
+    throw err;
   }
   return data as T;
 }
 
 export const cinemaApi = {
-  async getBallotData(): Promise<{ settings: VotingSettings; movies: Movie[] }> {
+  async getBallotData(): Promise<{
+    settings: VotingSettings;
+    movies: Movie[];
+    public_standings: PublicStandings;
+  }> {
     if (IS_SANDBOX_MODE) return sandboxBackend.getBallotData();
     const res = await callEdgeFunction<{
       ok: true;
       settings: VotingSettings;
       movies: Movie[];
+      public_standings: PublicStandings;
     }>('get-ballot-data', { method: 'GET' });
-    return { settings: res.settings, movies: res.movies };
+    return {
+      settings: res.settings,
+      movies: res.movies,
+      public_standings: res.public_standings,
+    };
   },
 
   async requestOtp(payload: {

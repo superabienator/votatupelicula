@@ -250,7 +250,14 @@ const RFC5322_DOMAIN_REGEX =
   /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
 export function normalizeEmail(raw: string): string {
-  return raw.trim().toLowerCase();
+  const clean = raw.trim().toLowerCase();
+  const atIndex = clean.indexOf('@');
+  if (atIndex <= 0) return clean;
+  const local = clean.slice(0, atIndex);
+  const domain = clean.slice(atIndex + 1);
+  const plusIndex = local.indexOf('+');
+  const baseLocal = plusIndex > 0 ? local.slice(0, plusIndex) : local;
+  return `${baseLocal}@${domain}`;
 }
 
 export function stripAccents(raw: string): string {
@@ -259,6 +266,7 @@ export function stripAccents(raw: string): string {
 
 export function normalizeNamePart(raw: string): string {
   return stripAccents(raw)
+    .replace(/[\r\n]+/g, ' ')
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ');
@@ -337,18 +345,27 @@ export interface VoterValidationResult {
 
 export function validateVoterIdentity(
   input: {
-    nombre: string;
-    apellidos: string;
-    curso: string;
-    email: string;
+    nombre: unknown;
+    apellidos: unknown;
+    curso: unknown;
+    email: unknown;
   },
   allowedClasses: string[],
   allowedEmailDomains: string[]
 ): VoterValidationResult {
-  const nombre = normalizeNamePart(input.nombre || '');
-  const apellidos = normalizeNamePart(input.apellidos || '');
-  const curso = (input.curso || '').trim();
-  const email = normalizeEmail(input.email || '');
+  if (
+    typeof input.nombre !== 'string' ||
+    typeof input.apellidos !== 'string' ||
+    typeof input.curso !== 'string' ||
+    typeof input.email !== 'string'
+  ) {
+    return { valid: false, error: 'Todos los campos de identidad son obligatorios y deben ser texto.' };
+  }
+
+  const nombre = normalizeNamePart(input.nombre);
+  const apellidos = normalizeNamePart(input.apellidos);
+  const curso = input.curso.trim();
+  const email = normalizeEmail(input.email);
 
   if (nombre.length < 2 || nombre.length > 80) {
     return { valid: false, error: 'Introduce tu nombre real (mínimo 2 caracteres).' };

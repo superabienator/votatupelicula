@@ -1,13 +1,16 @@
 import { MotionConfig } from 'framer-motion';
 import {
-  ChevronUp,
+  BarChart3,
+  ChevronDown,
   Clapperboard,
   Film,
   HelpCircle,
   Languages,
   Popcorn,
+  ShieldCheck,
   Sparkles,
   Ticket,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AdminPortalModal } from './components/AdminPortalModal';
@@ -16,13 +19,20 @@ import { CinemaTicketModal } from './components/CinemaTicketModal';
 import { CivicEducationModal } from './components/CivicEducationModal';
 import { MovieCard } from './components/MovieCard';
 import { MovieDetailModal } from './components/MovieDetailModal';
+import { PublicStandingsModal } from './components/PublicStandingsModal';
 import { RankingDock } from './components/RankingDock';
 import { TrailerPlayerModal } from './components/TrailerPlayerModal';
 import { VoterAuthModal } from './components/VoterAuthModal';
 import { useI18n } from './i18n/I18nContext';
 import { LANGUAGE_LABELS } from './i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from './services/api';
-import type { AppLanguage, Movie, MoviePalette, VotingSettings } from './types/cinema';
+import type {
+  AppLanguage,
+  Movie,
+  MoviePalette,
+  PublicStandings,
+  VotingSettings,
+} from './types/cinema';
 import { getScoringWeightsList } from './utils/borda';
 import { DEFAULT_PALETTE, blendPalettes, hexToRgba } from './utils/colorExtractor';
 import { assignMovieRank, moveMovieByStep } from './utils/ranking';
@@ -37,7 +47,9 @@ export function App() {
   const { lang, setLang, t } = useI18n();
   const [settings, setSettings] = useState<VotingSettings | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [publicStandings, setPublicStandings] = useState<PublicStandings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Estado de votación en memoria (sin cookies / localStorage / sessionStorage)
@@ -48,11 +60,13 @@ export function App() {
   const [inspectedMovie, setInspectedMovie] = useState<Movie | null>(null);
   const [trailerMovie, setTrailerMovie] = useState<Movie | null>(null);
 
-  // Modales
+  // Modales y avisos
   const [civicModalOpen, setCivicModalOpen] = useState(false);
+  const [standingsModalOpen, setStandingsModalOpen] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
+  const [logoutNoticeMode, setLogoutNoticeMode] = useState<'voter' | 'admin' | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
@@ -67,13 +81,20 @@ export function App() {
 
   const dockRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchBallot = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const fetchBallot = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const data = await cinemaApi.getBallotData();
       setSettings(data.settings);
       setMovies(data.movies);
+      setPublicStandings(data.public_standings);
+      setLoadError(null);
       // Limpia películas que hayan pasado a borrador o excedan el top_k actualizado
       setRankedMovies((prev) =>
         prev
@@ -81,11 +102,15 @@ export function App() {
           .slice(0, data.settings.top_k)
       );
     } catch (err) {
-      setLoadError(
-        err instanceof Error ? err.message : 'No se pudo cargar la cartelera.'
-      );
+      if (!silent) {
+        setLoadError(err instanceof Error ? err.message : '');
+      }
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -140,7 +165,7 @@ export function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="cinema-noise relative min-h-screen overflow-x-hidden bg-[#12172e] text-white">
+    <div className="cinema-noise relative min-h-screen overflow-x-clip bg-[#12172e] text-white">
       {/* Iluminación ambiental luminosa y dinámica derivada de la cartelera */}
       <div
         aria-hidden="true"
@@ -158,21 +183,23 @@ export function App() {
       <CinemaDecorations />
 
       {/* BARRA SUPERIOR SIEMPRE ACCESIBLE */}
-      <header className="sticky top-0 z-40 border-b border-white/15 bg-[#141a34]/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-white/15 bg-[#141a34]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 sm:px-6 lg:flex-nowrap lg:py-3">
           <div className="flex items-center gap-3">
             {!logoFailed ? (
-              <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white/95 p-1 shadow-lg ring-2 ring-amber-300/60">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/95 p-1 shadow-lg ring-2 ring-amber-300/60">
                 <img
                   src="/logo.png"
-                  alt="Logo VotaTuPelícula"
+                  alt={t.brandLogoAlt}
+                  width={44}
+                  height={44}
                   onError={() => setLogoFailed(true)}
                   className="h-full w-full object-contain"
                 />
               </div>
             ) : (
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl text-slate-950 shadow-lg ring-2 ring-white/25 transition-colors duration-500"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 shadow-lg ring-2 ring-white/25 transition-colors duration-500"
                 style={{
                   background: `linear-gradient(135deg, ${activePalette.accent}, ${activePalette.primary})`,
                 }}
@@ -191,7 +218,7 @@ export function App() {
                   </span>
                 )}
               </div>
-              <p className="hidden text-[11px] text-sky-200/80 sm:block">
+              <p className="hidden text-[11px] text-sky-200/80 md:block">
                 {t.brandSubtitle}
               </p>
             </div>
@@ -201,7 +228,7 @@ export function App() {
             {/* Selector de idioma: Castellano, Valencià, English */}
             <div
               role="group"
-              aria-label="Language selector"
+              aria-label={t.languageSelectorLabel}
               className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/10 p-1"
             >
               <Languages className="ml-1.5 hidden h-3.5 w-3.5 text-amber-200 sm:block" />
@@ -223,11 +250,24 @@ export function App() {
               ))}
             </div>
 
+            {/* Botón público del estado de la votación (100% anónimo RGPD/LOPDGDD) */}
+            <button
+              type="button"
+              onClick={() => {
+                setStandingsModalOpen(true);
+                fetchBallot({ silent: true });
+              }}
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-2.5 py-2 text-xs font-bold text-emerald-100 shadow-sm transition hover:bg-emerald-400/30 sm:px-3"
+            >
+              <BarChart3 className="h-4 w-4 text-emerald-200" />
+              <span>{t.standingsBtn}</span>
+            </button>
+
             {/* Botón didáctico obligatorio accesible en todo momento */}
             <button
               type="button"
               onClick={() => setCivicModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300/45 bg-sky-400/20 px-3 py-2 text-xs font-bold text-sky-100 shadow-sm transition hover:bg-sky-400/30"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-sky-300/45 bg-sky-400/20 px-2.5 py-2 text-xs font-bold text-sky-100 shadow-sm transition hover:bg-sky-400/30 sm:px-3"
             >
               <HelpCircle className="h-4 w-4 text-sky-200" />
               <span>{t.howItWorksBtn}</span>
@@ -236,7 +276,36 @@ export function App() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:pb-16">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 lg:pb-16">
+        {/* Aviso legal RGPD / LOPDGDD al cerrar sesión (logout) */}
+        {logoutNoticeMode && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-6 flex flex-col justify-between gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-950/55 p-4 text-xs text-emerald-100 shadow-xl backdrop-blur-md sm:flex-row sm:items-center"
+          >
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+              <div>
+                <p className="font-display text-sm font-bold text-white">
+                  {t.gdprTitle}
+                </p>
+                <p className="mt-0.5 leading-relaxed text-emerald-100/90">
+                  {logoutNoticeMode === 'admin' ? t.adminLogoutNotice : t.gdprLogoutNotice}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLogoutNoticeMode(null)}
+              className="inline-flex shrink-0 items-center justify-center gap-1 self-end rounded-xl border border-emerald-300/40 bg-emerald-400/20 px-3 py-1.5 font-bold text-white hover:bg-emerald-400/30 sm:self-center"
+            >
+              <X className="h-3.5 w-3.5" />
+              {t.gdprLogoutDismissBtn}
+            </button>
+          </div>
+        )}
+
         {/* HERO DE CARTELERA CON TIRA DE CINE */}
         <section className="cinema-marquee mb-8 overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-[#1d2549]/95 via-[#181f3d]/90 to-[#241b42]/95 backdrop-blur-md">
           <FilmStripDivider />
@@ -287,7 +356,8 @@ export function App() {
                       key={w.rank}
                       className="rounded-xl border border-amber-300/30 bg-amber-400/15 px-2.5 py-1 font-mono text-xs font-bold text-amber-200"
                     >
-                      {w.rank}º = {w.points} {w.points === 1 ? t.ptSingular : t.ptPlural}
+                      {t.rankOrdinal(w.rank)} = {w.points}{' '}
+                      {w.points === 1 ? t.ptSingular : t.ptPlural}
                     </span>
                   ))}
                 </div>
@@ -300,24 +370,34 @@ export function App() {
 
         {/* ESTADO DE CARGA / ERROR */}
         {loading && (
-          <div className="grid gap-4 md:grid-cols-2">
-            {[1, 2, 3, 4].map((n) => (
-              <div
-                key={n}
-                className="h-56 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]"
-              />
-            ))}
+          <div
+            role="status"
+            aria-busy="true"
+            className="grid items-start gap-7 lg:grid-cols-[1fr_360px]"
+          >
+            <div className="grid gap-4 xl:grid-cols-2">
+              {[1, 2, 3, 4].map((n) => (
+                <div
+                  key={n}
+                  className="h-56 animate-pulse rounded-3xl border border-white/10 bg-white/[0.03]"
+                />
+              ))}
+            </div>
+            <div className="h-80 animate-pulse rounded-3xl border border-white/10 bg-white/[0.03]" />
           </div>
         )}
 
-        {!loading && loadError && (
-          <div className="rounded-3xl border border-rose-500/35 bg-rose-950/20 p-8 text-center">
+        {!loading && loadError !== null && (
+          <div
+            role="alert"
+            className="rounded-3xl border border-rose-500/35 bg-rose-950/20 p-8 text-center"
+          >
             <p className="text-sm font-semibold text-rose-200">
               {loadError || t.loadErrorFallback}
             </p>
             <button
               type="button"
-              onClick={fetchBallot}
+              onClick={() => fetchBallot()}
               className="mt-4 rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-950"
             >
               {t.retryBtn}
@@ -326,7 +406,7 @@ export function App() {
         )}
 
         {/* GRID DE PELÍCULAS + DOCK DE RANKING */}
-        {!loading && !loadError && (
+        {!loading && loadError === null && (
           <div className="grid items-start gap-7 lg:grid-cols-[1fr_360px]">
             <div>
               {movies.length === 0 ? (
@@ -358,7 +438,7 @@ export function App() {
             </div>
 
             {/* Columna derecha / inferior: Mi TOP */}
-            <div ref={dockRef} className="lg:sticky lg:top-20">
+            <div ref={dockRef} className="scroll-mt-24 lg:sticky lg:top-24">
               <RankingDock
                 rankedMovies={rankedMovies}
                 topK={topK}
@@ -377,13 +457,13 @@ export function App() {
 
       {/* Barra flotante móvil para saltar rápido a "Mi TOP" o abrir la entrada */}
       {!loading && movies.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/15 bg-[#090c16]/95 px-4 py-3 backdrop-blur-xl lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/15 bg-[#12172e]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
           <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
             <div>
               <p className="font-display text-xs font-bold text-white">
                 {t.mobileTopStatus(topK, rankedMovies.length)}
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-300">
                 {rankedMovies.length === topK
                   ? t.mobileTopReady
                   : t.mobileTopHint}
@@ -393,10 +473,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setTicketModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${activePalette.accent}, ${activePalette.primary})`,
-                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-sky-300 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg"
               >
                 <Ticket className="h-4 w-4" />
                 {t.voteNowBtn}
@@ -404,12 +481,18 @@ export function App() {
             ) : (
               <button
                 type="button"
-                onClick={() =>
-                  dockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                }
+                onClick={() => {
+                  const prefersReduced =
+                    typeof window !== 'undefined' &&
+                    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                  dockRef.current?.scrollIntoView({
+                    behavior: prefersReduced ? 'auto' : 'smooth',
+                    block: 'start',
+                  });
+                }}
                 className="inline-flex items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-bold text-white"
               >
-                <ChevronUp className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4" />
                 {t.seeMyTopBtn}
               </button>
             )}
@@ -449,7 +532,7 @@ export function App() {
 
       <CinemaTicketModal
         open={ticketModalOpen}
-        campaignTitle={settings?.campaign_title || 'CineFórum ESO'}
+        campaignTitle={settings?.campaign_title || t.footerBrand}
         rankedMovies={rankedMovies}
         topK={topK}
         scoringMode={scoringMode}
@@ -460,6 +543,16 @@ export function App() {
         }}
       />
 
+      <PublicStandingsModal
+        open={standingsModalOpen}
+        onClose={() => setStandingsModalOpen(false)}
+        standings={publicStandings}
+        movies={movies}
+        settings={settings}
+        loading={loading || refreshing}
+        onRefresh={() => fetchBallot({ silent: true })}
+      />
+
       {settings && (
         <VoterAuthModal
           open={authModalOpen}
@@ -467,8 +560,18 @@ export function App() {
           rankedMovies={rankedMovies}
           onClose={handleCloseAuthAndResetIfDone}
           onVoteCompleted={() => {
-            // Reinicia la papeleta en memoria para el siguiente compañero en el mismo equipo
+            // Reinicia la papeleta en memoria y refresca los resultados agregados públicos
             setRankedMovies([]);
+            fetchBallot({ silent: true });
+          }}
+          onVoterLogout={() => {
+            setAuthModalOpen(false);
+            setRankedMovies([]);
+            setLogoutNoticeMode('voter');
+          }}
+          onViewStandings={() => {
+            setStandingsModalOpen(true);
+            fetchBallot({ silent: true });
           }}
         />
       )}
@@ -478,11 +581,25 @@ export function App() {
         onClose={() => {
           setAdminModalOpen(false);
           if (isAdminUrl()) {
-            window.history.pushState({}, '', '/');
+            window.history.replaceState({}, '', '/');
           }
         }}
-        onPublicDataChanged={fetchBallot}
+        onAdminLogout={() => {
+          setAdminModalOpen(false);
+          if (isAdminUrl()) {
+            window.history.replaceState({}, '', '/');
+          }
+          setLogoutNoticeMode('admin');
+        }}
+        onPublicDataChanged={() => fetchBallot({ silent: true })}
       />
+
+      <footer className="relative z-10 mx-auto max-w-7xl px-4 pb-28 pt-2 text-center sm:px-6 lg:pb-10">
+        <p className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/25 px-4 py-2 text-[11px] text-slate-300">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+          <span>{t.gdprFooterShort}</span>
+        </p>
+      </footer>
     </div>
     </MotionConfig>
   );

@@ -2,6 +2,60 @@ import { getServiceSupabaseClient, verifyAdminRequest } from '../_shared/auth.ts
 import { handleCors, jsonResponse } from '../_shared/cors.ts';
 import { enrichMovieTitle } from '../_shared/enrichment.ts';
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
+
+function isSafeHttpUrl(raw: unknown): boolean {
+  if (typeof raw !== 'string') return false;
+  const trimmed = raw.trim();
+  if (!trimmed) return true;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function sanitizePaletteInput(raw: unknown): Record<string, unknown> {
+  const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const clean: Record<string, unknown> = {
+    primary:
+      typeof input.primary === 'string' && HEX_COLOR_REGEX.test(input.primary.trim())
+        ? input.primary.trim()
+        : '#6366f1',
+    secondary:
+      typeof input.secondary === 'string' && HEX_COLOR_REGEX.test(input.secondary.trim())
+        ? input.secondary.trim()
+        : '#ec4899',
+    accent:
+      typeof input.accent === 'string' && HEX_COLOR_REGEX.test(input.accent.trim())
+        ? input.accent.trim()
+        : '#f59e0b',
+  };
+
+  if (input.i18n && typeof input.i18n === 'object') {
+    clean.i18n = input.i18n;
+  }
+
+  if (input.trailers && typeof input.trailers === 'object') {
+    const tObj = input.trailers as Record<string, unknown>;
+    const cleanTrailers: Record<string, string> = {};
+    for (const k of ['es', 'va', 'en']) {
+      if (typeof tObj[k] === 'string') {
+        const url = tObj[k].trim();
+        if (url === '' || isSafeHttpUrl(url)) {
+          cleanTrailers[k] = url;
+        }
+      }
+    }
+    clean.trailers = cleanTrailers;
+  }
+
+  return clean;
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
@@ -104,6 +158,15 @@ Deno.serve(async (req) => {
         return jsonResponse({ ok: false, error: 'El título es obligatorio.' }, 400);
       }
 
+      const posterUrl = String(moviePayload.poster_url || '').trim();
+      const backdropUrl = String(moviePayload.backdrop_url || '').trim();
+      if (!isSafeHttpUrl(posterUrl) || !isSafeHttpUrl(backdropUrl)) {
+        return jsonResponse(
+          { ok: false, error: 'Las URLs de imágenes deben empezar por https:// o http://.' },
+          400
+        );
+      }
+
       const { data: inserted, error: insErr } = await supabase
         .from('movies')
         .insert({
@@ -117,13 +180,9 @@ Deno.serve(async (req) => {
           tags: Array.isArray(moviePayload.tags) ? moviePayload.tags : [],
           age_rating: String(moviePayload.age_rating || 'TP'),
           synopsis: String(moviePayload.synopsis || ''),
-          poster_url: String(moviePayload.poster_url || ''),
-          backdrop_url: String(moviePayload.backdrop_url || ''),
-          palette: moviePayload.palette || {
-            primary: '#6366f1',
-            secondary: '#ec4899',
-            accent: '#f59e0b',
-          },
+          poster_url: posterUrl,
+          backdrop_url: backdropUrl,
+          palette: sanitizePaletteInput(moviePayload.palette),
           status: 'draft',
           source_provider: 'manual',
         })
@@ -138,8 +197,8 @@ Deno.serve(async (req) => {
     if (action === 'update') {
       const id = String(body?.id || '').trim();
       const patch = body?.patch ?? {};
-      if (!id) {
-        return jsonResponse({ ok: false, error: 'Falta el ID de la película.' }, 400);
+      if (!id || !UUID_REGEX.test(id)) {
+        return jsonResponse({ ok: false, error: 'Falta un ID de película válido.' }, 400);
       }
 
       const allowedPatch: Record<string, unknown> = {};
@@ -163,7 +222,7 @@ Deno.serve(async (req) => {
         if (patch[field] !== undefined) {
           if (field === 'poster_url' || field === 'backdrop_url') {
             const urlStr = String(patch[field] || '').trim();
-            if (urlStr !== '' && !/^https?:\/\//i.test(urlStr)) {
+            if (!isSafeHttpUrl(urlStr)) {
               return jsonResponse(
                 {
                   ok: false,
@@ -173,6 +232,29 @@ Deno.serve(async (req) => {
               );
             }
             allowedPatch[field] = urlStr;
+          } else if (field === 'palette') {
+            if (patch.palette && typeof patch.palette === 'object') {
+              const tObj = (patch.palette as Record<string, unknown>).trailers as
+                | Record<string, unknown>
+                | undefined;
+              if (tObj) {
+                for (const k of ['es', 'va', 'en']) {
+                  if (tObj[k] && !isSafeHttpUrl(tObj[k])) {
+                    return jsonResponse(
+                      { ok: false, error: 'Las URLs de tráiler deben usar https:// o http://.' },
+                      400
+                    );
+                  }
+                }
+              }
+            }
+            allowedPatch.palette = sanitizePaletteInput(patch.palette);
+          } else if (field === 'status') {
+            const st = String(patch.status);
+            if (!['draft', 'published', 'archived'].includes(st)) {
+              return jsonResponse({ ok: false, error: 'Estado de película no válido.' }, 400);
+            }
+            allowedPatch.status = st;
           } else {
             allowedPatch[field] = patch[field];
           }
@@ -303,8 +385,8 @@ Deno.serve(async (req) => {
 
     if (action === 'delete_vote') {
       const voteId = String(body?.vote_id || '').trim();
-      if (!voteId) {
-        return jsonResponse({ ok: false, error: 'Falta el ID del voto.' }, 400);
+      if (!voteId || !UUID_REGEX.test(voteId)) {
+        return jsonResponse({ ok: false, error: 'Falta un ID de voto válido.' }, 400);
       }
       const { error: delVoteErr } = await supabase
         .from('votes')
@@ -321,11 +403,23 @@ Deno.serve(async (req) => {
         ? body.ranked_movie_ids.map(String)
         : undefined;
 
-      if (!voteId) {
-        return jsonResponse({ ok: false, error: 'Falta el ID del voto.' }, 400);
+      if (!voteId || !UUID_REGEX.test(voteId)) {
+        return jsonResponse({ ok: false, error: 'Falta un ID de voto válido.' }, 400);
       }
 
+      const { data: settingsRow } = await supabase
+        .from('voting_settings')
+        .select('top_k, scoring_mode, allowed_classes')
+        .eq('id', 1)
+        .single();
+
       if (curso) {
+        const allowedClasses: string[] = Array.isArray(settingsRow?.allowed_classes)
+          ? settingsRow.allowed_classes.map(String)
+          : [];
+        if (allowedClasses.length > 0 && !allowedClasses.includes(curso)) {
+          return jsonResponse({ ok: false, error: 'Clase / curso no válido.' }, 400);
+        }
         const { error: updVoteErr } = await supabase
           .from('votes')
           .update({ curso })
@@ -334,18 +428,27 @@ Deno.serve(async (req) => {
       }
 
       if (rankedMovieIds && rankedMovieIds.length > 0) {
-        const { data: settingsRow } = await supabase
-          .from('voting_settings')
-          .select('top_k, scoring_mode')
-          .eq('id', 1)
-          .single();
-
         const topK = settingsRow?.top_k === 5 ? 5 : 3;
         const scoringMode = settingsRow?.scoring_mode === 'fractional' ? 'fractional' : 'classic';
         const uniqueIds = new Set(rankedMovieIds);
-        if (uniqueIds.size !== rankedMovieIds.length || rankedMovieIds.length !== topK) {
+        if (
+          uniqueIds.size !== rankedMovieIds.length ||
+          rankedMovieIds.length !== topK ||
+          !rankedMovieIds.every((mid) => UUID_REGEX.test(mid))
+        ) {
           return jsonResponse(
-            { ok: false, error: `Debes elegir exactamente ${topK} películas distintas.` },
+            { ok: false, error: `Debes elegir exactamente ${topK} películas distintas válidas.` },
+            400
+          );
+        }
+
+        const { data: validMovies } = await supabase
+          .from('movies')
+          .select('id')
+          .in('id', rankedMovieIds);
+        if (!validMovies || validMovies.length !== rankedMovieIds.length) {
+          return jsonResponse(
+            { ok: false, error: 'Alguna de las películas seleccionadas no existe.' },
             400
           );
         }

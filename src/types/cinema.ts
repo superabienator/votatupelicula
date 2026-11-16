@@ -123,6 +123,19 @@ export interface VoteLogEntry {
   choices: VoteLogChoice[];
 }
 
+export interface PublicStandings {
+  total_votes: number;
+  grand_total_points: number;
+  participation_by_class: ClassParticipation[];
+  leaderboard: LeaderboardEntry[];
+  pedagogical_comparison: {
+    fptp_winner: LeaderboardEntry | null;
+    borda_winner: LeaderboardEntry | null;
+    consensus_winner: LeaderboardEntry | null;
+    diverged: boolean;
+  };
+}
+
 export interface DashboardResults {
   settings: VotingSettings;
   total_votes: number;

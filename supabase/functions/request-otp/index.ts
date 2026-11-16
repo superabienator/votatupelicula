@@ -25,6 +25,13 @@ Deno.serve(async (req) => {
 
     const supabase = getServiceSupabaseClient();
 
+    // Limpieza oportunista RGPD de tokens OTP caducados
+    try {
+      await supabase.rpc('purge_expired_otp_tokens');
+    } catch {
+      // No bloquear solicitud si la purga automática no aplica
+    }
+
     // 1. Leer configuración vigente
     const { data: settings, error: settingsErr } = await supabase
       .from('voting_settings')
@@ -230,7 +237,7 @@ Deno.serve(async (req) => {
     }
 
     // 7. Despachar el correo OTP
-    const displayStudentName = `${String(nombre).trim()} ${String(apellidos).trim()}`.trim();
+    const displayStudentName = `${String(nombre).replace(/[\r\n]+/g, ' ').trim()} ${String(apellidos).replace(/[\r\n]+/g, ' ').trim()}`.trim();
     const mailResult = await sendOtpEmail({
       to: normEmail,
       code: otpCode,

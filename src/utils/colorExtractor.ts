@@ -22,6 +22,30 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/**
+ * Calcula color de texto legible (#020617 o #ffffff) con contraste WCAG AA sobre un fondo hex.
+ */
+export function getReadableTextColor(hex?: string | null): '#020617' | '#ffffff' {
+  const clean = (hex || '#6366f1').replace('#', '');
+  const normalized =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean.padEnd(6, '0').slice(0, 6);
+
+  const channels = [0, 2, 4].map((i) => {
+    const v = Number.parseInt(normalized.slice(i, i + 2), 16);
+    const channel = (Number.isFinite(v) ? v : 128) / 255;
+    return channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  return luminance > 0.179 ? '#020617' : '#ffffff';
+}
+
 export function blendPalettes(palettes: MoviePalette[]): MoviePalette {
   if (!palettes || palettes.length === 0) return DEFAULT_PALETTE;
   if (palettes.length === 1) return palettes[0];

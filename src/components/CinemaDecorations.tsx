@@ -21,12 +21,12 @@ export function CinemaDecorations() {
       </div>
 
       {/* Motivo medio izquierdo: Carrete de cine */}
-      <div className="absolute left-6 top-[54%] rotate-[12deg] text-sky-300/[0.08]">
+      <div className="hidden md:block absolute left-6 top-[54%] rotate-[12deg] text-sky-300/[0.08]">
         <Film className="h-32 w-32 sm:h-40 sm:w-40" strokeWidth={1.3} />
       </div>
 
       {/* Motivo inferior derecho: Entrada de cine */}
-      <div className="absolute bottom-16 right-8 rotate-[-18deg] text-emerald-300/[0.08]">
+      <div className="hidden md:block absolute bottom-20 right-8 rotate-[-18deg] text-emerald-300/[0.08]">
         <Ticket className="h-36 w-36 sm:h-44 sm:w-44" strokeWidth={1.3} />
       </div>
 
@@ -42,17 +42,5 @@ export function CinemaDecorations() {
  * Tira perforada de celuloide 35mm para enmarcar secciones clave.
  */
 export function FilmStripDivider() {
-  return (
-    <div
-      aria-hidden="true"
-      className="flex items-center justify-between gap-2 overflow-hidden px-2 py-1.5 opacity-45"
-    >
-      {Array.from({ length: 24 }, (_, i) => (
-        <span
-          key={i}
-          className="h-2 w-3.5 shrink-0 rounded-[3px] border border-white/40 bg-white/15"
-        />
-      ))}
-    </div>
-  );
+  return <div aria-hidden="true" className="film-strip-divider my-1 w-full" />;
 }
