@@ -82,6 +82,7 @@ export interface VoteReceipt {
   vote_id: string;
   curso: string;
   created_at: string;
+  audit_hash: string;
   rankedMovies: Movie[];
 }
 
@@ -120,7 +121,13 @@ export interface VoteLogEntry {
   curso: string;
   email: string;
   created_at: string;
+  audit_hash: string;
   choices: VoteLogChoice[];
+}
+
+export interface VerifiedAuditHashEntry {
+  audit_hash: string;
+  curso: string;
 }
 
 export interface PublicStandings {
@@ -134,6 +141,7 @@ export interface PublicStandings {
     consensus_winner: LeaderboardEntry | null;
     diverged: boolean;
   };
+  verified_hashes?: VerifiedAuditHashEntry[];
 }
 
 export interface DashboardResults {

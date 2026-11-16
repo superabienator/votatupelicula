@@ -5,6 +5,7 @@ import {
   translateGenreOrTag,
 } from '../i18n/translations';
 import { getReadableTextColor } from '../utils/colorExtractor';
+import { computeVoteAuditHash, normalizeAuditHash } from '../utils/auditHash';
 import {
   buildStudentFingerprint,
   isAllowedSchoolDomain,
@@ -109,5 +110,16 @@ describe('Normalización de identidad y antifraude', () => {
     expect(ok.valid).toBe(true);
     expect(ok.normalized?.huellaAlumno).toBe('hugo_perez gil_1º ESO A');
     expect(ok.normalized?.email).toBe('hugo@gmail.com');
+  });
+
+  it('genera hashes de auditoría deterministas con formato VTP-XXXX-XXXX-XXXX y normaliza entradas', () => {
+    const h1 = computeVoteAuditHash('vote-1234', '2º ESO A');
+    const h2 = computeVoteAuditHash('vote-1234', '2º ESO A');
+    const hOther = computeVoteAuditHash('vote-1235', '2º ESO A');
+
+    expect(h1).toMatch(/^VTP-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+    expect(h1).toBe(h2);
+    expect(h1).not.toBe(hOther);
+    expect(normalizeAuditHash(`  ${h1.toLowerCase()}  `)).toBe(h1);
   });
 });

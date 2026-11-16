@@ -1,21 +1,27 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  AlertCircle,
   BarChart3,
+  CheckCircle2,
   Crown,
+  Fingerprint,
   GraduationCap,
   Medal,
   RefreshCw,
   Scale,
+  Search,
   ShieldCheck,
   Sparkles,
   Trophy,
   Users,
   X,
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { getLocalizedMovie } from '../i18n/translations';
 import type { Movie, PublicStandings, VotingSettings } from '../types/cinema';
 import { hexToRgba } from '../utils/colorExtractor';
+import { normalizeAuditHash } from '../utils/auditHash';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 
@@ -27,6 +33,7 @@ interface PublicStandingsModalProps {
   settings: VotingSettings | null;
   loading: boolean;
   onRefresh: () => void;
+  initialAuditHash?: string;
 }
 
 export function PublicStandingsModal({
@@ -37,9 +44,44 @@ export function PublicStandingsModal({
   settings,
   loading,
   onRefresh,
+  initialAuditHash,
 }: PublicStandingsModalProps) {
   const { lang, t } = useI18n();
+  const [auditQuery, setAuditQuery] = useState('');
+  const [checkedHash, setCheckedHash] = useState<string | null>(null);
   useEscapeKey(open, onClose);
+
+  useEffect(() => {
+    if (!open) {
+      setAuditQuery('');
+      setCheckedHash(null);
+      return;
+    }
+    if (initialAuditHash) {
+      const normalized = normalizeAuditHash(initialAuditHash);
+      setAuditQuery(normalized);
+      setCheckedHash(normalized);
+    }
+  }, [open, initialAuditHash]);
+
+  const verifiedEntry = useMemo(() => {
+    if (!checkedHash) return null;
+    const entries = standings?.verified_hashes ?? [];
+    return (
+      entries.find((entry) => normalizeAuditHash(entry.audit_hash) === checkedHash) ?? null
+    );
+  }, [checkedHash, standings?.verified_hashes]);
+
+  function handleAuditCheck(e: React.FormEvent) {
+    e.preventDefault();
+    const normalized = normalizeAuditHash(auditQuery);
+    if (!normalized) {
+      setCheckedHash(null);
+      return;
+    }
+    setAuditQuery(normalized);
+    setCheckedHash(normalized);
+  }
 
   const movieMap = new Map(movies.map((m) => [m.id, m]));
   const getTitle = (movieId: string, fallback: string) => {
@@ -157,6 +199,66 @@ export function PublicStandingsModal({
                     : '0%'}
                 </p>
               </div>
+            </div>
+
+            {/* Verificador público de auditoría ciudadana por hash */}
+            <div className="mt-5 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-200">
+                    <Fingerprint className="h-4 w-4 text-indigo-300" />
+                    <span>{t.auditVerifierTitle}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-300">{t.auditVerifierDesc}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAuditCheck} className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={auditQuery}
+                    onChange={(e) => {
+                      setAuditQuery(e.target.value);
+                      if (!e.target.value.trim()) setCheckedHash(null);
+                    }}
+                    placeholder={t.auditVerifierPlaceholder}
+                    aria-label={t.auditVerifierTitle}
+                    className="w-full rounded-xl border border-white/15 bg-black/40 py-2.5 pl-9 pr-3 font-mono text-xs text-white placeholder-slate-500 focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-indigo-400"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  {t.auditVerifierBtn}
+                </button>
+              </form>
+
+              {checkedHash && (
+                <div
+                  data-testid="audit-verifier-result"
+                  className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
+                    verifiedEntry
+                      ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
+                      : 'border-rose-400/35 bg-rose-500/15 text-rose-200'
+                  }`}
+                >
+                  {verifiedEntry ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+                      <span>{t.auditVerifiedOk(verifiedEntry.curso)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-300" />
+                      <span>{t.auditVerifiedNotFound}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {totalVotes === 0 ? (

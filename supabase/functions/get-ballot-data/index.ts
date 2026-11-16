@@ -1,3 +1,4 @@
+import { computeVoteAuditHash } from '../_shared/auditHash.ts';
 import { getServiceSupabaseClient } from '../_shared/auth.ts';
 import { handleCors, jsonResponse } from '../_shared/cors.ts';
 
@@ -151,6 +152,10 @@ Deno.serve(async (req) => {
             bordaWinner && fptpWinner && bordaWinner.movie_id !== fptpWinner.movie_id
           ),
         },
+        verified_hashes: (voteRefs ?? []).map((v) => ({
+          audit_hash: computeVoteAuditHash(v.id, v.curso),
+          curso: v.curso,
+        })),
       },
     });
   } catch (err) {

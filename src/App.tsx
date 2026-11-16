@@ -67,6 +67,7 @@ export function App() {
   // Modales y avisos
   const [civicModalOpen, setCivicModalOpen] = useState(false);
   const [standingsModalOpen, setStandingsModalOpen] = useState(false);
+  const [standingsAuditHash, setStandingsAuditHash] = useState<string | undefined>(undefined);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
@@ -258,6 +259,7 @@ export function App() {
             <button
               type="button"
               onClick={() => {
+                setStandingsAuditHash(undefined);
                 setStandingsModalOpen(true);
                 fetchBallot({ silent: true });
               }}
@@ -562,12 +564,16 @@ export function App() {
 
       <PublicStandingsModal
         open={standingsModalOpen}
-        onClose={() => setStandingsModalOpen(false)}
+        onClose={() => {
+          setStandingsModalOpen(false);
+          setStandingsAuditHash(undefined);
+        }}
         standings={publicStandings}
         movies={movies}
         settings={settings}
         loading={loading || refreshing}
         onRefresh={() => fetchBallot({ silent: true })}
+        initialAuditHash={standingsAuditHash}
       />
 
       {settings && (
@@ -586,7 +592,8 @@ export function App() {
             setRankedMovies([]);
             setLogoutNoticeMode('voter');
           }}
-          onViewStandings={() => {
+          onViewStandings={(hash) => {
+            setStandingsAuditHash(hash);
             setStandingsModalOpen(true);
             fetchBallot({ silent: true });
           }}

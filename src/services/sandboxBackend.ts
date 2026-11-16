@@ -6,6 +6,7 @@ import type {
   VoteReceipt,
   VotingSettings,
 } from '../types/cinema';
+import { computeVoteAuditHash } from '../utils/auditHash';
 import { getBordaPoints } from '../utils/borda';
 import { validateVoterForm } from '../utils/normalization';
 
@@ -455,6 +456,10 @@ function buildStandingsAggregate(): PublicStandings {
         bordaWinner && fptpWinner && bordaWinner.movie_id !== fptpWinner.movie_id
       ),
     },
+    verified_hashes: votes.map((v) => ({
+      audit_hash: computeVoteAuditHash(v.id, v.curso),
+      curso: v.curso,
+    })),
   };
 }
 
@@ -613,6 +618,25 @@ export const sandboxBackend = {
       vote_id: voteId,
       curso: token.curso,
       created_at: createdAt,
+      audit_hash: computeVoteAuditHash(voteId, token.curso),
+    };
+  },
+
+  async sendVoteReceipt(payload: {
+    challenge_id: string;
+    vote_id: string;
+  }): Promise<{ ok: true; sent: true; email: string; audit_hash: string; provider: string }> {
+    const token = otpStore.get(payload.challenge_id);
+    const vote = votes.find((v) => v.id === payload.vote_id);
+    if (!token || !vote || token.email !== vote.email) {
+      throw codedError('No se pudo confirmar el envío del recibo.', 'RECEIPT_NOT_AUTHORIZED');
+    }
+    return {
+      ok: true,
+      sent: true,
+      email: vote.email,
+      audit_hash: computeVoteAuditHash(vote.id, vote.curso),
+      provider: 'demo-sandbox',
     };
   },
 
@@ -787,6 +811,7 @@ export const sandboxBackend = {
         curso: v.curso,
         email: v.email,
         created_at: v.created_at,
+        audit_hash: computeVoteAuditHash(v.id, v.curso),
         choices: v.rankedMovieIds.slice(0, settings.top_k).map((movieId, idx) => ({
           rank_position: idx + 1,
           movie_id: movieId,

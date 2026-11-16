@@ -95,6 +95,17 @@ export const cinemaApi = {
     });
   },
 
+  async sendVoteReceipt(payload: {
+    challenge_id: string;
+    vote_id: string;
+  }): Promise<{ ok: true; sent: true; email: string; audit_hash: string; provider?: string }> {
+    if (IS_SANDBOX_MODE) return sandboxBackend.sendVoteReceipt(payload);
+    return callEdgeFunction('verify-otp', {
+      method: 'POST',
+      body: { action: 'send_receipt', ...payload },
+    });
+  },
+
   async checkAdminSecret(adminSecret: string): Promise<boolean> {
     if (IS_SANDBOX_MODE) return sandboxBackend.checkAdminSecret(adminSecret);
     await callEdgeFunction<{ ok: true }>('admin-auth-check', {

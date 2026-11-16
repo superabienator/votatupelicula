@@ -172,16 +172,37 @@ describe('Interfaz VotaTuPelícula, idiomas, tráilers y educación cívica', ()
       expect(
         screen.getByText(/Aviso de Protección de Datos y Anonimato \(RGPD \/ LOPDGDD\)/i)
       ).toBeInTheDocument();
+      expect(
+        screen.getByText(/¿Por qué es clave poder auditar el voto en democracia\?/i)
+      ).toBeInTheDocument();
     });
 
+    const hashEl = screen.getByTestId('vote-audit-hash');
+    const emittedHash = hashEl.textContent!.trim();
+    expect(emittedHash).toMatch(/^VTP-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+
+    // Solicita el envío opcional del resguardo + hash por correo
     fireEvent.click(
-      screen.getByRole('button', { name: /Cerrar sesión y finalizar/i })
+      screen.getByRole('button', { name: /Enviar confirmación y código a mi correo/i })
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Confirmación y hash de auditoría enviados a/i)
+      ).toBeInTheDocument();
+    });
+
+    // Salta a "Estado de la votación" y verifica el hash emitido públicamente sin exponer datos
+    fireEvent.click(
+      screen.getByRole('button', { name: /Ver estado de la votación/i })
     );
 
     await waitFor(() => {
       expect(
         screen.getByText(/Sesión cerrada correctamente y memoria del dispositivo limpiada/i)
       ).toBeInTheDocument();
+      expect(screen.getByTestId('audit-verifier-result')).toHaveTextContent(
+        /Voto verificado y contabilizado correctamente en el escrutinio/i
+      );
     });
   });
 

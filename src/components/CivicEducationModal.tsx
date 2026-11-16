@@ -3,7 +3,9 @@ import {
   AlertTriangle,
   Award,
   CheckCircle2,
+  Fingerprint,
   Scale,
+  ShieldCheck,
   Sparkles,
   ThumbsUp,
   Users,
@@ -296,6 +298,36 @@ export function CivicEducationModal({
                 <p className="mt-3 text-xs leading-relaxed text-slate-200">
                   {t.civicSys3Footer}
                 </p>
+              </div>
+            </div>
+
+            {/* Bloque didáctico: verificabilidad y auditoría democrática del voto */}
+            <div className="mt-6 rounded-2xl border border-indigo-400/30 bg-gradient-to-br from-indigo-500/15 via-slate-900/60 to-emerald-500/10 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/35 bg-indigo-500/20 px-2.5 py-0.5 text-[11px] font-bold text-indigo-200">
+                  <Fingerprint className="h-3.5 w-3.5 text-indigo-300" />
+                  {t.civicAuditBadge}
+                </span>
+              </div>
+              <h3 className="mt-2 font-display text-lg font-extrabold text-white">
+                {t.civicAuditTitle}
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                {t.civicAuditDesc}
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-xs leading-relaxed text-slate-200">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                    <span>{t.civicAuditP1}</span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-xs leading-relaxed text-slate-200">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                    <span>{t.civicAuditP2}</span>
+                  </div>
+                </div>
               </div>
             </div>
 

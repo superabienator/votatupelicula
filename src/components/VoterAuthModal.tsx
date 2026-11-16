@@ -2,7 +2,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   BarChart3,
+  BookOpen,
+  Check,
   CheckCircle2,
+  Copy,
+  Fingerprint,
   KeyRound,
   Loader2,
   LogOut,
@@ -24,6 +28,7 @@ import type {
   VoterIdentityForm,
   VotingSettings,
 } from '../types/cinema';
+import { computeVoteAuditHash } from '../utils/auditHash';
 import { validateVoterForm } from '../utils/normalization';
 import { useEscapeKey } from '../utils/useEscapeKey';
 
@@ -34,7 +39,7 @@ interface VoterAuthModalProps {
   onClose: () => void;
   onVoteCompleted: (receipt: VoteReceipt) => void;
   onVoterLogout: () => void;
-  onViewStandings: () => void;
+  onViewStandings: (auditHash?: string) => void;
 }
 
 type Step = 'identity' | 'otp' | 'success';
@@ -64,6 +69,10 @@ export function VoterAuthModal({
   const [expiresSecondsLeft, setExpiresSecondsLeft] = useState(600);
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
   const [receipt, setReceipt] = useState<VoteReceipt | null>(null);
+  const [copiedAudit, setCopiedAudit] = useState(false);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+  const [receiptSentEmail, setReceiptSentEmail] = useState<string | null>(null);
+  const [receiptSendError, setReceiptSendError] = useState<string | null>(null);
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   useEscapeKey(open && step !== 'success', onClose);
@@ -84,8 +93,45 @@ export function VoterAuthModal({
       setExpiresSecondsLeft(600);
       setCooldownSecondsLeft(0);
       setReceipt(null);
+      setCopiedAudit(false);
+      setSendingReceipt(false);
+      setReceiptSentEmail(null);
+      setReceiptSendError(null);
     }
   }, [open, settings.allowed_classes]);
+
+  const handleCopyAuditHash = async () => {
+    if (!receipt?.audit_hash) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(receipt.audit_hash);
+      }
+      setCopiedAudit(true);
+      window.setTimeout(() => setCopiedAudit(false), 2500);
+    } catch {
+      setCopiedAudit(true);
+      window.setTimeout(() => setCopiedAudit(false), 2500);
+    }
+  };
+
+  const handleSendReceiptEmail = async () => {
+    if (!challenge || !receipt || sendingReceipt) return;
+    setSendingReceipt(true);
+    setReceiptSendError(null);
+    try {
+      const res = await cinemaApi.sendVoteReceipt({
+        challenge_id: challenge.challenge_id,
+        vote_id: receipt.vote_id,
+      });
+      setReceiptSentEmail(res.email || challenge.email);
+    } catch (err) {
+      setReceiptSendError(
+        err instanceof Error ? err.message : t.receiptEmailErrorFallback
+      );
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
 
   // Temporizadores de validez (10 min) y reenvío (60s)
   useEffect(() => {
@@ -201,6 +247,8 @@ export function VoterAuthModal({
       });
       const fullReceipt: VoteReceipt = {
         ...result,
+        audit_hash:
+          result.audit_hash || computeVoteAuditHash(result.vote_id, result.curso),
         rankedMovies,
       };
       setReceipt(fullReceipt);
@@ -556,10 +604,76 @@ export function VoterAuthModal({
                   <p className="mt-1 text-xs text-slate-300">
                     {t.voteSuccessSubtitle(receipt.curso)}
                   </p>
-                  <p className="mt-2 inline-block rounded-lg bg-black/40 px-3 py-1 font-mono text-[11px] text-slate-400">
-                    {t.receiptPrefix}
-                    {receipt.vote_id.slice(0, 8).toUpperCase()}
+                </div>
+
+                {/* Código / Hash único de auditoría ciudadana */}
+                <div className="rounded-2xl border border-indigo-400/35 bg-indigo-500/10 p-4 text-left">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-200">
+                      <Fingerprint className="h-4 w-4 text-indigo-300" />
+                      <span>{t.auditCodeTitle}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyAuditHash}
+                      className="inline-flex items-center gap-1 rounded-lg border border-indigo-300/30 bg-indigo-500/20 px-2.5 py-1 text-[11px] font-bold text-indigo-100 transition hover:bg-indigo-500/30"
+                    >
+                      {copiedAudit ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-300" />
+                          <span>{t.auditCopiedBtn}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>{t.auditCopyBtn}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p
+                    data-testid="vote-audit-hash"
+                    className="mt-2 select-all rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-center font-mono text-sm font-extrabold tracking-widest text-amber-300 sm:text-base"
+                  >
+                    {receipt.audit_hash}
                   </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-300">
+                    {t.auditCodeSubtitle}
+                  </p>
+
+                  {/* Envío opcional de resguardo y hash de auditoría al correo */}
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    {receiptSentEmail ? (
+                      <div className="flex items-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-200">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+                        <span>{t.receiptEmailSentBadge(receiptSentEmail)}</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendReceiptEmail}
+                        disabled={sendingReceipt}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-300/35 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20 disabled:opacity-60"
+                      >
+                        {sendingReceipt ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Mail className="h-3.5 w-3.5 text-amber-300" />
+                        )}
+                        <span>
+                          {sendingReceipt ? t.sendingReceiptEmailBtn : t.sendReceiptEmailBtn}
+                        </span>
+                      </button>
+                    )}
+
+                    {receiptSendError && (
+                      <p className="mt-2 flex items-center gap-1.5 text-[11px] text-rose-300">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>{receiptSendError}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left">
@@ -580,6 +694,17 @@ export function VoterAuthModal({
                   </ol>
                 </div>
 
+                {/* Explicación didáctica: por qué es vital poder auditar el voto en democracia */}
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3.5 text-left">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-200">
+                    <BookOpen className="h-4 w-4 shrink-0 text-amber-300" />
+                    <span>{t.didacticAuditTitle}</span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-slate-200">
+                    {t.didacticAuditBody}
+                  </p>
+                </div>
+
                 {/* Coletilla legal RGPD / LOPDGDD al finalizar y cerrar sesión */}
                 <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3.5 text-left">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
@@ -595,8 +720,9 @@ export function VoterAuthModal({
                   <button
                     type="button"
                     onClick={() => {
+                      const hashToCheck = receipt.audit_hash;
                       onVoterLogout();
-                      onViewStandings();
+                      onViewStandings(hashToCheck);
                     }}
                     className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-sky-400/40 bg-sky-500/15 px-4 py-3 text-xs font-bold text-sky-100 transition hover:bg-sky-500/25"
                   >

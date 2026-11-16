@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   FileSpreadsheet,
+  Fingerprint,
   GraduationCap,
   Medal,
   RefreshCw,
@@ -27,6 +28,7 @@ import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { getLocalizedMovie } from '../i18n/translations';
 import type { DashboardResults, Movie, VoteLogEntry } from '../types/cinema';
+import { computeVoteAuditHash } from '../utils/auditHash';
 import { hexToRgba } from '../utils/colorExtractor';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
@@ -665,6 +667,13 @@ export function ResultsDashboard({
                       <span className="font-mono text-[11px] text-slate-400">
                         {showIdentities ? vote.email : maskEmailAddress(vote.email)}
                       </span>
+                      <span
+                        title={tx.censusColAuditHash}
+                        className="inline-flex items-center gap-1 rounded-md border border-indigo-400/25 bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-200"
+                      >
+                        <Fingerprint className="h-3 w-3 text-indigo-300" />
+                        {vote.audit_hash || computeVoteAuditHash(vote.id, vote.curso)}
+                      </span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-300">
                       {vote.choices.map((ch) => (
@@ -928,6 +937,7 @@ export function ResultsDashboard({
             tx.censusColNombre,
             tx.censusColCurso,
             ...(censusIncludeEmail ? [tx.censusColEmail] : []),
+            tx.censusColAuditHash,
             tx.censusColTimestamp,
           ];
           const rows = sortedRoster.map((v, idx) => [
@@ -936,6 +946,7 @@ export function ResultsDashboard({
             formatReadableName(v.nombre),
             v.curso,
             ...(censusIncludeEmail ? [v.email] : []),
+            v.audit_hash || computeVoteAuditHash(v.id, v.curso),
             new Date(v.created_at).toLocaleString(),
           ]);
           const csvBody =
@@ -957,7 +968,8 @@ export function ResultsDashboard({
 
         const handleCopyRoster = async () => {
           const lines = sortedRoster.map((v, idx) => {
-            const base = `${idx + 1}. ${formatReadableName(v.apellidos)}, ${formatReadableName(v.nombre)} — ${v.curso}`;
+            const auditHash = v.audit_hash || computeVoteAuditHash(v.id, v.curso);
+            const base = `${idx + 1}. ${formatReadableName(v.apellidos)}, ${formatReadableName(v.nombre)} — ${v.curso} [${auditHash}]`;
             return censusIncludeEmail ? `${base} (${v.email})` : base;
           });
           await navigator.clipboard?.writeText(lines.join('\n')).catch(() => {});
@@ -1045,6 +1057,7 @@ export function ResultsDashboard({
                         {censusIncludeEmail && (
                           <th className="px-3 py-2.5">{tx.censusColEmail}</th>
                         )}
+                        <th className="px-3 py-2.5">{tx.censusColAuditHash}</th>
                         <th className="px-3 py-2.5">{tx.censusColTimestamp}</th>
                       </tr>
                     </thead>
@@ -1068,6 +1081,9 @@ export function ResultsDashboard({
                               {v.email}
                             </td>
                           )}
+                          <td className="px-3 py-2 font-mono text-[11px] font-bold text-indigo-200">
+                            {v.audit_hash || computeVoteAuditHash(v.id, v.curso)}
+                          </td>
                           <td className="px-3 py-2 font-mono text-[11px] text-slate-400">
                             {new Date(v.created_at).toLocaleString()}
                           </td>

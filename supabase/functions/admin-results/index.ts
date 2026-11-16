@@ -1,3 +1,4 @@
+import { computeVoteAuditHash } from '../_shared/auditHash.ts';
 import { getServiceSupabaseClient, verifyAdminRequest } from '../_shared/auth.ts';
 import { handleCors, jsonResponse } from '../_shared/cors.ts';
 
@@ -190,6 +191,7 @@ Deno.serve(async (req) => {
       curso: v.curso,
       email: v.email,
       created_at: v.created_at,
+      audit_hash: computeVoteAuditHash(v.id, v.curso),
       choices: (choicesByVote.get(v.id) ?? []).sort(
         (a, b) => a.rank_position - b.rank_position
       ),

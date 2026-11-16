@@ -579,6 +579,36 @@ export const UI_TEXT = {
       `Tu voto preferencial de ${curso} ya forma parte del escrutinio.`,
     receiptPrefix: 'Recibo #',
     savedOrderTitle: 'Tu orden guardado',
+    auditCodeTitle: 'Código único para auditar tu voto',
+    auditCodeSubtitle:
+      'Guarda este identificador anónimo para comprobar después en el escrutinio público que tu voto se ha contabilizado intacto.',
+    auditCopyBtn: 'Copiar código',
+    auditCopiedBtn: '¡Copiado!',
+    sendReceiptEmailBtn: 'Enviar confirmación y código a mi correo',
+    sendingReceiptEmailBtn: 'Enviando confirmación…',
+    receiptEmailSentBadge: (email: string) =>
+      `Confirmación y hash de auditoría enviados a ${email}.`,
+    receiptEmailErrorFallback: 'No se pudo enviar el correo de confirmación en este momento.',
+    didacticAuditTitle: '¿Por qué es clave poder auditar el voto en democracia?',
+    didacticAuditBody:
+      'En una votación democrática real, no basta con confiar a ciegas en el recuento: necesitas verificabilidad individual (comprobar con tu código único que tu voto está dentro de la urna sin alteraciones) combinada con secreto del voto (ese código no muestra nunca tu nombre en público ni permite coacciones). Así se previenen errores técnicos y manipulaciones.',
+    auditVerifierTitle: 'Auditoría ciudadana: verifica tu código de voto',
+    auditVerifierDesc:
+      'Introduce tu código único (ej. VTP-XXXX-XXXX-XXXX) para comprobar si tu voto figura incluido en la urna pública sin revelar tu nombre ni tus películas.',
+    auditVerifierPlaceholder: 'VTP-XXXX-XXXX-XXXX',
+    auditVerifierBtn: 'Verificar voto',
+    auditVerifiedOk: (curso: string) =>
+      `Voto verificado y contabilizado correctamente en el escrutinio (${curso}).`,
+    auditVerifiedNotFound:
+      'Ese código no aparece entre los votos contabilizados. Revisa que esté bien escrito o actualiza los datos.',
+    civicAuditBadge: 'Transparencia y Auditoría',
+    civicAuditTitle: '4. Votos validables y auditables en democracia',
+    civicAuditDesc:
+      'Un proceso electoral democrático combina secreto del sufragio con trazabilidad verificable:',
+    civicAuditP1:
+      'Verificabilidad individual: al votar recibes un código o hash único anónimo (VTP-...) para comprobar en el escrutinio público que tu papeleta entró intacta en la urna.',
+    civicAuditP2:
+      'Privacidad garantizada: el hash de auditoría nunca revela tu identidad ni tus elecciones al resto de votantes, evitando presiones o compra de votos.',
     // CivicEducationModal
     civicBadge: 'Educación Cívica y Democrática',
     civicTitle: '¿Cómo funciona tu voto?',
@@ -836,6 +866,7 @@ export const UI_TEXT = {
       censusColCurso: 'Curso / Grupo',
       censusColEmail: 'Correo OTP',
       censusColTimestamp: 'Fecha verificación',
+      censusColAuditHash: 'Código Auditoría',
       censusTotalCount: (n: number) => `${n} votante${n === 1 ? '' : 's'} en el listado`,
     },
   },
@@ -947,6 +978,36 @@ export const UI_TEXT = {
       `El teu vot preferencial de ${curso} ja forma part de l’escrutini.`,
     receiptPrefix: 'Rebut #',
     savedOrderTitle: 'El teu ordre guardat',
+    auditCodeTitle: 'Codi únic per auditar el teu vot',
+    auditCodeSubtitle:
+      'Guarda aquest identificador anònim per comprovar després a l’escrutini públic que el teu vot s’ha comptabilitzat intacte.',
+    auditCopyBtn: 'Copiar codi',
+    auditCopiedBtn: 'Copiat!',
+    sendReceiptEmailBtn: 'Enviar confirmació i codi al meu correu',
+    sendingReceiptEmailBtn: 'Enviant confirmació…',
+    receiptEmailSentBadge: (email: string) =>
+      `Confirmació i hash d’auditoria enviats a ${email}.`,
+    receiptEmailErrorFallback: 'No s’ha pogut enviar el correu de confirmació ara mateix.',
+    didacticAuditTitle: 'Per què és clau poder auditar el vot en democràcia?',
+    didacticAuditBody:
+      'En una votació democràtica real, no n’hi ha prou amb confiar a cegues en el recompte: cal verificabilitat individual (comprovar amb el teu codi únic que el teu vot és dins l’urna sense alteracions) combinada amb secret del vot (aquest codi no mostra mai el teu nom en públic ni permet coaccions). Així es prevenen errors i manipulacions.',
+    auditVerifierTitle: 'Auditoria ciutadana: verifica el teu codi de vot',
+    auditVerifierDesc:
+      'Introdueix el teu codi únic (ex. VTP-XXXX-XXXX-XXXX) per comprovar si el teu vot figura inclòs a l’urna pública sense revelar el teu nom ni les teues pel·lícules.',
+    auditVerifierPlaceholder: 'VTP-XXXX-XXXX-XXXX',
+    auditVerifierBtn: 'Verificar vot',
+    auditVerifiedOk: (curso: string) =>
+      `Vot verificat i comptabilitzat correctament en l’escrutini (${curso}).`,
+    auditVerifiedNotFound:
+      'Aquest codi no apareix entre els vots comptabilitzats. Revisa que estiga ben escrit o actualitza les dades.',
+    civicAuditBadge: 'Transparència i Auditoria',
+    civicAuditTitle: '4. Vots validables i auditables en democràcia',
+    civicAuditDesc:
+      'Un procés electoral democràtic combina secret del sufragi amb traçabilitat verificable:',
+    civicAuditP1:
+      'Verificabilitat individual: en votar reps un codi o hash únic anònim (VTP-...) per comprovar a l’escrutini públic que la teua papereta va entrar intacta a l’urna.',
+    civicAuditP2:
+      'Privacitat garantida: el hash d’auditoria mai revela la teua identitat ni les teues eleccions a la resta de votants, evitant pressions o compra de vots.',
     // CivicEducationModal
     civicBadge: 'Educació Cívica i Democràtica',
     civicTitle: 'Com funciona el teu vot?',
@@ -1204,6 +1265,7 @@ export const UI_TEXT = {
       censusColCurso: 'Curs / Grup',
       censusColEmail: 'Correu OTP',
       censusColTimestamp: 'Data verificació',
+      censusColAuditHash: 'Codi Auditoria',
       censusTotalCount: (n: number) => `${n} votant${n === 1 ? '' : 's'} al llistat`,
     },
   },
@@ -1313,6 +1375,36 @@ export const UI_TEXT = {
       `Your ranked vote from ${curso} is now counted.`,
     receiptPrefix: 'Receipt #',
     savedOrderTitle: 'Your saved ranking',
+    auditCodeTitle: 'Unique hash to audit your vote',
+    auditCodeSubtitle:
+      'Save this anonymous identifier to verify later in the live standings that your ballot was counted intact.',
+    auditCopyBtn: 'Copy code',
+    auditCopiedBtn: 'Copied!',
+    sendReceiptEmailBtn: 'Email me confirmation & audit code',
+    sendingReceiptEmailBtn: 'Sending confirmation…',
+    receiptEmailSentBadge: (email: string) =>
+      `Confirmation and audit hash sent to ${email}.`,
+    receiptEmailErrorFallback: 'Could not send confirmation email right now.',
+    didacticAuditTitle: 'Why do verifiable, auditable votes matter in a democracy?',
+    didacticAuditBody:
+      'In a real democracy, voters should not have to rely on blind trust: individual verifiability lets every citizen confirm their unique receipt code is counted inside the ballot box intact, while ballot secrecy ensures that the code never exposes your identity or choices in public to prevent coercion.',
+    auditVerifierTitle: 'Citizen Audit: Verify your vote code',
+    auditVerifierDesc:
+      'Enter your unique vote hash (e.g. VTP-XXXX-XXXX-XXXX) to verify that your ballot is counted in the public tally without revealing your name or picks.',
+    auditVerifierPlaceholder: 'VTP-XXXX-XXXX-XXXX',
+    auditVerifierBtn: 'Verify vote',
+    auditVerifiedOk: (curso: string) =>
+      `Vote verified and officially counted in the live tally (${curso}).`,
+    auditVerifiedNotFound:
+      'That hash was not found among counted ballots. Check spelling or refresh the standings.',
+    civicAuditBadge: 'Transparency & Auditability',
+    civicAuditTitle: '4. Verifiable & Auditable Votes in Democracy',
+    civicAuditDesc:
+      'A trustworthy democratic election combines ballot secrecy with verifiable integrity:',
+    civicAuditP1:
+      'Individual verifiability: after casting your ballot you receive an anonymous hash (VTP-...) to confirm your vote entered the ballot box unaltered.',
+    civicAuditP2:
+      'Guaranteed secrecy: the audit hash never reveals your name or ranked picks to others, protecting voters against pressure or tampering.',
     // CivicEducationModal
     civicBadge: 'Civic & Democratic Education',
     civicTitle: 'How does your vote work?',
@@ -1570,6 +1662,7 @@ export const UI_TEXT = {
       censusColCurso: 'Class / Group',
       censusColEmail: 'OTP Email',
       censusColTimestamp: 'Verified at',
+      censusColAuditHash: 'Audit Hash',
       censusTotalCount: (n: number) => `${n} verified voter${n === 1 ? '' : 's'} listed`,
     },
   },
