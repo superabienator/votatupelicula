@@ -92,80 +92,12 @@ function buildReceiptHtml(params: SendVoteReceiptParams): string {
 
 /**
  * Envía un correo mediante el proveedor configurado en los secretos de Supabase.
- * Prioriza APIs dedicadas (Resend, Brevo) antes del relay opcional de Apps Script.
+ * Prioriza Google Apps Script (Gmail 0€) y mantiene Brevo/Resend como alternativas.
  */
 async function dispatchEmail(
   req: DispatchEmailRequest
 ): Promise<SendOtpEmailResult> {
-  const senderEmail = Deno.env.get('MAIL_FROM_EMAIL')?.trim();
-  const senderName =
-    Deno.env.get('MAIL_FROM_NAME')?.trim() || req.campaignTitle;
-  const replyTo = Deno.env.get('MAIL_REPLY_TO')?.trim();
-
-  // Opción 1 (Recomendada): Resend API con API key dedicada
-  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
-  if (resendKey) {
-    const resendFrom = senderEmail || 'onboarding@resend.dev';
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from: `${senderName} <${resendFrom}>`,
-        to: [req.to],
-        subject: req.subject,
-        html: req.html,
-        text: req.text,
-        ...(replyTo ? { reply_to: replyTo } : {}),
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      return {
-        sent: false,
-        provider: 'resend',
-        error: `Resend falló (${res.status})${errText ? `: ${errText}` : '.'}`,
-      };
-    }
-
-    return { sent: true, provider: 'resend' };
-  }
-
-  // Opción 2: Brevo API (300 emails/día)
-  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
-  if (brevoKey && senderEmail) {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': brevoKey,
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: req.to, name: req.toName }],
-        subject: req.subject,
-        htmlContent: req.html,
-        textContent: req.text,
-        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      return {
-        sent: false,
-        provider: 'brevo',
-        error: `Brevo falló (${res.status})${errText ? `: ${errText}` : '.'}`,
-      };
-    }
-
-    return { sent: true, provider: 'brevo' };
-  }
-
-  // Opción 3: Google Apps Script + Gmail / Google Workspace Edu
+  // Opción 1 (0€ sin dominio propio): Google Apps Script + Gmail / Google Workspace Edu
   const gasWebhookUrl = Deno.env.get('GAS_EMAIL_WEBHOOK_URL')?.trim();
   const gasSecret = Deno.env.get('GAS_WEBHOOK_SECRET')?.trim();
   if (gasWebhookUrl && gasSecret) {
@@ -198,6 +130,73 @@ async function dispatchEmail(
     return { sent: true, provider: 'gas-gmail' };
   }
 
+  const senderEmail = Deno.env.get('MAIL_FROM_EMAIL')?.trim();
+  const senderName =
+    Deno.env.get('MAIL_FROM_NAME')?.trim() || req.campaignTitle;
+  const replyTo = Deno.env.get('MAIL_REPLY_TO')?.trim();
+
+  // Opción 2: Brevo API (300 emails/día)
+  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
+  if (brevoKey && senderEmail) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': brevoKey,
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: req.to, name: req.toName }],
+        subject: req.subject,
+        htmlContent: req.html,
+        textContent: req.text,
+        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        sent: false,
+        provider: 'brevo',
+        error: `Brevo falló (${res.status})${errText ? `: ${errText}` : '.'}`,
+      };
+    }
+
+    return { sent: true, provider: 'brevo' };
+  }
+
+  // Opción 3: Resend API
+  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  if (resendKey && senderEmail) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from: `${senderName} <${senderEmail}>`,
+        to: [req.to],
+        subject: req.subject,
+        html: req.html,
+        text: req.text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        sent: false,
+        provider: 'resend',
+        error: `Resend falló (${res.status})${errText ? `: ${errText}` : '.'}`,
+      };
+    }
+
+    return { sent: true, provider: 'resend' };
+  }
+
   // Opción 4: Modo desarrollo explícito (solo si OTP_DEV_MODE=true)
   if (Deno.env.get('OTP_DEV_MODE') === 'true') {
     console.warn(req.devLogMessage);
@@ -212,7 +211,7 @@ async function dispatchEmail(
     sent: false,
     provider: 'dev-console',
     error:
-      'No hay proveedor de correo configurado (RESEND_API_KEY, BREVO_API_KEY o GAS_EMAIL_WEBHOOK_URL).',
+      'No hay proveedor de correo configurado (GAS_EMAIL_WEBHOOK_URL, BREVO_API_KEY o RESEND_API_KEY).',
   };
 }
 
