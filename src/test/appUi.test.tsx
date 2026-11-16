@@ -22,6 +22,11 @@ describe('Interfaz VotaTuPelícula y educación cívica', () => {
       expect(screen.getByText('Interstellar')).toBeInTheDocument();
     });
 
+    // El acceso de administración no aparece en el menú público
+    expect(
+      screen.queryByRole('button', { name: /Profesorado|Admin/i })
+    ).not.toBeInTheDocument();
+
     // Abrir modal didáctico obligatorio
     fireEvent.click(screen.getByRole('button', { name: /¿Cómo funciona tu voto\?/i }));
     expect(screen.getByText(/1\. Mayoría Simple/i)).toBeInTheDocument();
@@ -58,5 +63,16 @@ describe('Interfaz VotaTuPelícula y educación cívica', () => {
 
     localGetSpy.mockRestore();
     localSetSpy.mockRestore();
+  });
+
+  it('abre el panel de administración al entrar en /admin', async () => {
+    window.history.pushState({}, '', '/admin');
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Acceso protegido')).toBeInTheDocument();
+    });
+
+    window.history.pushState({}, '', '/');
   });
 });

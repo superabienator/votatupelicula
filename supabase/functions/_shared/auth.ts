@@ -28,7 +28,9 @@ export function constantTimeEquals(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export function verifyAdminRequest(req: Request): { ok: boolean; error?: string } {
+export async function verifyAdminRequest(
+  req: Request
+): Promise<{ ok: boolean; error?: string }> {
   const expectedSecret = Deno.env.get('ADMIN_SECRET')?.trim();
   if (!expectedSecret) {
     return {
@@ -39,6 +41,8 @@ export function verifyAdminRequest(req: Request): { ok: boolean; error?: string 
 
   const provided = req.headers.get('x-admin-secret')?.trim() || '';
   if (!provided || !constantTimeEquals(provided, expectedSecret)) {
+    // Retardo defensivo para mitigar fuerza bruta sobre ADMIN_SECRET
+    await new Promise((resolve) => setTimeout(resolve, 450));
     return { ok: false, error: 'Clave de administración incorrecta.' };
   }
 

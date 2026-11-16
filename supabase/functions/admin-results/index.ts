@@ -5,7 +5,7 @@ Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const auth = verifyAdminRequest(req);
+  const auth = await verifyAdminRequest(req);
   if (!auth.ok) {
     return jsonResponse({ ok: false, error: auth.error }, 401);
   }

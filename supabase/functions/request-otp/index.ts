@@ -161,13 +161,27 @@ Deno.serve(async (req) => {
     }
 
     // 5. Rate limit de 60 segundos entre solicitudes de reenvío (por email o huella)
-    const { data: recentTokens } = await supabase
-      .from('otp_tokens')
-      .select('id, last_sent_at')
-      .or(`email.eq.${normEmail},huella_alumno.eq.${huellaAlumno}`)
-      .is('used_at', null)
-      .order('last_sent_at', { ascending: false })
-      .limit(1);
+    const [{ data: recentByEmail }, { data: recentByHuella }] = await Promise.all([
+      supabase
+        .from('otp_tokens')
+        .select('id, last_sent_at')
+        .eq('email', normEmail)
+        .is('used_at', null)
+        .order('last_sent_at', { ascending: false })
+        .limit(1),
+      supabase
+        .from('otp_tokens')
+        .select('id, last_sent_at')
+        .eq('huella_alumno', huellaAlumno)
+        .is('used_at', null)
+        .order('last_sent_at', { ascending: false })
+        .limit(1),
+    ]);
+
+    const recentTokens = [...(recentByEmail ?? []), ...(recentByHuella ?? [])].sort(
+      (a, b) =>
+        new Date(b.last_sent_at).getTime() - new Date(a.last_sent_at).getTime()
+    );
 
     if (recentTokens && recentTokens.length > 0) {
       const elapsedSeconds = Math.floor(

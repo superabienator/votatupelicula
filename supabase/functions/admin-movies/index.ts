@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const auth = verifyAdminRequest(req);
+  const auth = await verifyAdminRequest(req);
   if (!auth.ok) {
     return jsonResponse({ ok: false, error: auth.error }, 401);
   }
@@ -161,7 +161,21 @@ Deno.serve(async (req) => {
 
       for (const field of allowedFields) {
         if (patch[field] !== undefined) {
-          allowedPatch[field] = patch[field];
+          if (field === 'poster_url' || field === 'backdrop_url') {
+            const urlStr = String(patch[field] || '').trim();
+            if (urlStr !== '' && !/^https?:\/\//i.test(urlStr)) {
+              return jsonResponse(
+                {
+                  ok: false,
+                  error: 'Las URLs de imágenes deben empezar por https:// o http://.',
+                },
+                400
+              );
+            }
+            allowedPatch[field] = urlStr;
+          } else {
+            allowedPatch[field] = patch[field];
+          }
         }
       }
 

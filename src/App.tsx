@@ -3,7 +3,6 @@ import {
   Clapperboard,
   Film,
   HelpCircle,
-  Lock,
   Popcorn,
   Search,
   Sparkles,
@@ -24,6 +23,12 @@ import { getScoringWeightsList } from './utils/borda';
 import { DEFAULT_PALETTE, blendPalettes, hexToRgba } from './utils/colorExtractor';
 import { assignMovieRank, moveMovieByStep } from './utils/ranking';
 
+function isAdminUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const cleanPath = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+  return cleanPath === '/admin' || window.location.hash.toLowerCase() === '#/admin';
+}
+
 export function App() {
   const [settings, setSettings] = useState<VotingSettings | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -43,8 +48,18 @@ export function App() {
   const [civicModalOpen, setCivicModalOpen] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminModalOpen, setAdminModalOpen] = useState(() => isAdminUrl());
   const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    const syncAdminRoute = () => setAdminModalOpen(isAdminUrl());
+    window.addEventListener('popstate', syncAdminRoute);
+    window.addEventListener('hashchange', syncAdminRoute);
+    return () => {
+      window.removeEventListener('popstate', syncAdminRoute);
+      window.removeEventListener('hashchange', syncAdminRoute);
+    };
+  }, []);
 
   const dockRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,7 +179,7 @@ export function App() {
             {!logoFailed ? (
               <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white/95 p-1 shadow-lg ring-2 ring-amber-300/60">
                 <img
-                  src="./logo.png"
+                  src="/logo.png"
                   alt="Logo VotaTuPelícula"
                   onError={() => setLogoFailed(true)}
                   className="h-full w-full object-contain"
@@ -206,16 +221,6 @@ export function App() {
             >
               <HelpCircle className="h-4 w-4 text-sky-200" />
               <span>¿Cómo funciona tu voto?</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAdminModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
-            >
-              <Lock className="h-3.5 w-3.5 text-amber-300" />
-              <span className="hidden sm:inline">Profesorado / Resultados</span>
-              <span className="sm:hidden">Admin</span>
             </button>
           </div>
         </div>
@@ -347,9 +352,9 @@ export function App() {
           <div className="grid items-start gap-7 lg:grid-cols-[1fr_360px]">
             <div>
               {filteredMovies.length === 0 ? (
-                <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-10 text-center text-sm text-slate-400">
+                <div className="rounded-3xl border border-white/15 bg-white/[0.04] p-10 text-center text-sm text-slate-300">
                   {movies.length === 0
-                    ? 'Aún no hay películas publicadas en la cartelera. El profesorado puede publicarlas desde "Profesorado / Resultados".'
+                    ? 'Aún no hay películas publicadas en la cartelera.'
                     : 'No hay películas que coincidan con tu búsqueda.'}
                 </div>
               ) : (
@@ -486,7 +491,12 @@ export function App() {
 
       <AdminPortalModal
         open={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
+        onClose={() => {
+          setAdminModalOpen(false);
+          if (isAdminUrl()) {
+            window.history.pushState({}, '', '/');
+          }
+        }}
         onPublicDataChanged={fetchBallot}
       />
     </div>
