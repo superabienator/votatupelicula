@@ -206,6 +206,28 @@ describe('Interfaz VotaTuPelícula, idiomas, tráilers y educación cívica', ()
       expect(screen.getByRole('tab', { name: /Cartelera/i })).toBeInTheDocument();
     });
 
+    // Abre Dashboard de Resultados y el generador de lista censo (Colegio)
+    fireEvent.click(screen.getByRole('tab', { name: /Dashboard de Resultados/i }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Generar lista censo \(Colegio\)/i })
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Generar lista censo \(Colegio\)/i })
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Lista oficial de votantes verificados \(Censo\)/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Secreto del voto garantizado/i)
+      ).toBeInTheDocument();
+    });
+    // Cierra el modal de censo (último botón "Cerrar")
+    const closeBtns = screen.getAllByRole('button', { name: /^Cerrar$/i });
+    fireEvent.click(closeBtns[closeBtns.length - 1]);
+
     fireEvent.click(screen.getByRole('button', { name: /Volver a Cartelera Pública/i }));
     await waitFor(() => {
       expect(screen.queryByText('Acceso de Administrador')).not.toBeInTheDocument();

@@ -2,10 +2,14 @@ import { motion } from 'framer-motion';
 import {
   AlertTriangle,
   BarChart3,
+  Check,
+  ClipboardCheck,
   Crown,
+  Download,
   Edit3,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   GraduationCap,
   Medal,
   RefreshCw,
@@ -58,6 +62,19 @@ function maskEmailAddress(email: string): string {
   return `${visible}***@${domain}`;
 }
 
+function escapeCsvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+function formatReadableName(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
+    .join(' ');
+}
+
 export function ResultsDashboard({
   results,
   movies,
@@ -72,6 +89,10 @@ export function ResultsDashboard({
   const tx = t.adminExtra;
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmDeleteVoteId, setConfirmDeleteVoteId] = useState<string | null>(null);
+  const [censusModalOpen, setCensusModalOpen] = useState(false);
+  const [censusClassFilter, setCensusClassFilter] = useState<string>('ALL');
+  const [censusIncludeEmail, setCensusIncludeEmail] = useState(false);
+  const [censusCopied, setCensusCopied] = useState(false);
   const [voteSearch, setVoteSearch] = useState('');
   const [showIdentities, setShowIdentities] = useState(false);
   const [editingVote, setEditingVote] = useState<VoteLogEntry | null>(null);
@@ -79,7 +100,9 @@ export function ResultsDashboard({
   const [editMovieIds, setEditMovieIds] = useState<string[]>([]);
   const [voteEditError, setVoteEditError] = useState<string | null>(null);
 
-  const hasSubModal = Boolean(confirmResetOpen || editingVote || confirmDeleteVoteId);
+  const hasSubModal = Boolean(
+    confirmResetOpen || editingVote || confirmDeleteVoteId || censusModalOpen
+  );
   useEffect(() => {
     onSubModalOpenChange?.(hasSubModal);
   }, [hasSubModal, onSubModalOpenChange]);
@@ -87,6 +110,7 @@ export function ResultsDashboard({
   useEscapeKey(confirmResetOpen, () => setConfirmResetOpen(false));
   useEscapeKey(Boolean(confirmDeleteVoteId), () => setConfirmDeleteVoteId(null));
   useEscapeKey(Boolean(editingVote), () => setEditingVote(null));
+  useEscapeKey(censusModalOpen, () => setCensusModalOpen(false));
 
   const movieById = new Map(movies.map((m) => [m.id, m]));
   const resolveTitle = (movieId: string, fallbackTitle: string) => {
@@ -138,6 +162,19 @@ export function ResultsDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setCensusCopied(false);
+              setCensusModalOpen(true);
+            }}
+            disabled={loading || total_votes === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-3.5 py-2 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            {tx.censusBtn}
+          </button>
+
           <button
             type="button"
             onClick={onRefresh}
@@ -871,6 +908,214 @@ export function ResultsDashboard({
           </form>
         </div>
       )}
+
+      {/* Modal generador de lista de censo (Nombres y Apellidos para el colegio, sin sentido del voto) */}
+      {censusModalOpen && (() => {
+        const sortedRoster = [...(results.votes_log ?? [])]
+          .filter((v) => censusClassFilter === 'ALL' || v.curso === censusClassFilter)
+          .sort((a, b) => {
+            const cCmp = a.curso.localeCompare(b.curso, 'es');
+            if (cCmp !== 0) return cCmp;
+            const aCmp = a.apellidos.localeCompare(b.apellidos, 'es');
+            if (aCmp !== 0) return aCmp;
+            return a.nombre.localeCompare(b.nombre, 'es');
+          });
+
+        const handleDownloadCsv = () => {
+          const headers = [
+            tx.censusColIndex,
+            tx.censusColApellidos,
+            tx.censusColNombre,
+            tx.censusColCurso,
+            ...(censusIncludeEmail ? [tx.censusColEmail] : []),
+            tx.censusColTimestamp,
+          ];
+          const rows = sortedRoster.map((v, idx) => [
+            String(idx + 1),
+            formatReadableName(v.apellidos),
+            formatReadableName(v.nombre),
+            v.curso,
+            ...(censusIncludeEmail ? [v.email] : []),
+            new Date(v.created_at).toLocaleString(),
+          ]);
+          const csvBody =
+            '\uFEFF' +
+            [headers, ...rows]
+              .map((line) => line.map((cell) => escapeCsvCell(cell)).join(';'))
+              .join('\r\n');
+          const blob = new Blob([csvBody], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateTag = new Date().toISOString().slice(0, 10);
+          link.download = `censo-votantes-${dateTag}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
+        const handleCopyRoster = async () => {
+          const lines = sortedRoster.map((v, idx) => {
+            const base = `${idx + 1}. ${formatReadableName(v.apellidos)}, ${formatReadableName(v.nombre)} — ${v.curso}`;
+            return censusIncludeEmail ? `${base} (${v.email})` : base;
+          });
+          await navigator.clipboard?.writeText(lines.join('\n')).catch(() => {});
+          setCensusCopied(true);
+          window.setTimeout(() => setCensusCopied(false), 2500);
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={() => setCensusModalOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="census-modal-title"
+              onClick={(e) => e.stopPropagation()}
+              className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-emerald-400/30 bg-[#12172e] text-white shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 bg-black/25 p-5">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-200">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {tx.censusPrivacyBadge}
+                  </span>
+                  <h4
+                    id="census-modal-title"
+                    className="mt-1.5 font-display text-lg font-extrabold text-white"
+                  >
+                    {tx.censusModalTitle}
+                  </h4>
+                  <p className="mt-0.5 text-xs text-slate-300">{tx.censusModalDesc}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label={t.closeBtn}
+                  onClick={() => setCensusModalOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    aria-label={tx.resultsCourseLabel}
+                    value={censusClassFilter}
+                    onChange={(e) => setCensusClassFilter(e.target.value)}
+                    className="rounded-xl border border-white/15 bg-[#090c16] px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    <option value="ALL">{tx.censusFilterAllClasses}</option>
+                    {settings.allowed_classes.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={censusIncludeEmail}
+                      onChange={(e) => setCensusIncludeEmail(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/30 bg-black/50 accent-emerald-400"
+                    />
+                    <span>{tx.censusIncludeEmailLabel}</span>
+                  </label>
+                </div>
+
+                <span className="font-mono font-bold text-emerald-300">
+                  {tx.censusTotalCount(sortedRoster.length)}
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto overscroll-contain p-5">
+                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/25">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-white/10 bg-white/[0.04] text-[11px] uppercase tracking-wider text-slate-300">
+                      <tr>
+                        <th className="px-3 py-2.5">{tx.censusColIndex}</th>
+                        <th className="px-3 py-2.5">{tx.censusColApellidos}</th>
+                        <th className="px-3 py-2.5">{tx.censusColNombre}</th>
+                        <th className="px-3 py-2.5">{tx.censusColCurso}</th>
+                        {censusIncludeEmail && (
+                          <th className="px-3 py-2.5">{tx.censusColEmail}</th>
+                        )}
+                        <th className="px-3 py-2.5">{tx.censusColTimestamp}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {sortedRoster.map((v, idx) => (
+                        <tr key={v.id} className="hover:bg-white/[0.03]">
+                          <td className="px-3 py-2 font-mono text-slate-400">{idx + 1}</td>
+                          <td className="px-3 py-2 font-semibold text-white">
+                            {formatReadableName(v.apellidos)}
+                          </td>
+                          <td className="px-3 py-2 text-slate-100">
+                            {formatReadableName(v.nombre)}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className="rounded-md bg-sky-500/20 px-2 py-0.5 font-mono text-[11px] font-bold text-sky-300">
+                              {v.curso}
+                            </span>
+                          </td>
+                          {censusIncludeEmail && (
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-300">
+                              {v.email}
+                            </td>
+                          )}
+                          <td className="px-3 py-2 font-mono text-[11px] text-slate-400">
+                            {new Date(v.created_at).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 bg-black/25 px-5 py-3.5">
+                <button
+                  type="button"
+                  onClick={() => setCensusModalOpen(false)}
+                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-white/10"
+                >
+                  {t.closeBtn}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyRoster}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/35 bg-sky-500/15 px-4 py-2 text-xs font-bold text-sky-100 hover:bg-sky-500/25"
+                >
+                  {censusCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-300" />
+                      {tx.censusCopiedBtn}
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardCheck className="h-3.5 w-3.5" />
+                      {tx.censusCopyListBtn}
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadCsv}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-slate-950 hover:bg-emerald-300"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {tx.censusDownloadCsvBtn}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
