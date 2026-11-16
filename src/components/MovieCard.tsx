@@ -37,14 +37,14 @@ export function MovieCard({
       transition={{ duration: 0.25 }}
       onMouseEnter={() => onHoverMovie?.(movie)}
       onMouseLeave={() => onHoverMovie?.(null)}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border bg-[#0d101b]/90 backdrop-blur-md transition-all duration-300"
+      className="group relative flex flex-col overflow-hidden rounded-3xl border bg-[#1b2242]/88 backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5"
       style={{
         borderColor: assignedRank
-          ? hexToRgba(movie.palette.primary, 0.75)
-          : 'rgba(255, 255, 255, 0.1)',
+          ? hexToRgba(movie.palette.primary, 0.85)
+          : 'rgba(255, 255, 255, 0.18)',
         boxShadow: assignedRank
-          ? `0 16px 40px -12px ${hexToRgba(movie.palette.primary, 0.45)}`
-          : '0 10px 30px -15px rgba(0, 0, 0, 0.7)',
+          ? `0 18px 44px -10px ${hexToRgba(movie.palette.primary, 0.52)}`
+          : '0 14px 36px -14px rgba(10, 14, 34, 0.75)',
       }}
     >
       {/* Halo dinámico superior según paleta de la película */}

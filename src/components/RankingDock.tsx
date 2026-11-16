@@ -41,7 +41,7 @@ export function RankingDock({
   return (
     <aside
       aria-label="Tu lista de preferencias"
-      className="rounded-3xl border border-white/15 bg-[#0d101b]/95 p-5 shadow-2xl backdrop-blur-xl"
+      className="cinema-marquee rounded-3xl border border-white/20 bg-gradient-to-b from-[#1e264a]/95 to-[#161c38]/95 p-5 shadow-2xl backdrop-blur-xl"
     >
       <div className="flex items-start justify-between gap-3">
         <div>

@@ -21,13 +21,21 @@ h1, h2, h3, .font-display {
   font-family: var(--font-display);
 }
 
-/* Textura sutil de sala de cine */
+/* Textura luminosa de sala de cine moderna */
 .cinema-noise {
   background-image: radial-gradient(
-    rgba(255, 255, 255, 0.04) 1px,
+    rgba(255, 255, 255, 0.08) 1px,
     transparent 0
   );
   background-size: 24px 24px;
+}
+
+/* Luces suaves tipo marquesina de cine */
+.cinema-marquee {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 20px 55px -15px rgba(56, 189, 248, 0.25),
+    0 0 36px -12px rgba(245, 158, 11, 0.22);
 }
 
 /* Muescas circulares para el modal estilo Entrada de Cine */
@@ -44,7 +52,7 @@ h1, h2, h3, .font-display {
   width: 24px;
   height: 24px;
   border-radius: 9999px;
-  background-color: #07070d;
+  background-color: #12172e;
   transform: translateY(-50%);
   z-index: 10;
 }

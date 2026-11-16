@@ -1,14 +1,17 @@
 import {
   ChevronUp,
   Clapperboard,
+  Film,
   HelpCircle,
   Lock,
+  Popcorn,
   Search,
   Sparkles,
   Ticket,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AdminPortalModal } from './components/AdminPortalModal';
+import { CinemaDecorations, FilmStripDivider } from './components/CinemaDecorations';
 import { CinemaTicketModal } from './components/CinemaTicketModal';
 import { CivicEducationModal } from './components/CivicEducationModal';
 import { MovieCard } from './components/MovieCard';
@@ -41,6 +44,7 @@ export function App() {
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   const dockRef = useRef<HTMLDivElement | null>(null);
 
@@ -136,45 +140,59 @@ export function App() {
   }
 
   return (
-    <div className="cinema-noise relative min-h-screen overflow-x-hidden bg-[#07070d] text-slate-100">
-      {/* Iluminación ambiental dinámica derivada de la cartelera */}
+    <div className="cinema-noise relative min-h-screen overflow-x-hidden bg-[#12172e] text-white">
+      {/* Iluminación ambiental luminosa y dinámica derivada de la cartelera */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 transition-all duration-700"
         style={{
           background: `
-            radial-gradient(circle at 15% 12%, ${hexToRgba(activePalette.primary, 0.22)} 0%, transparent 45%),
-            radial-gradient(circle at 88% 18%, ${hexToRgba(activePalette.secondary, 0.18)} 0%, transparent 42%),
-            radial-gradient(circle at 50% 90%, ${hexToRgba(activePalette.accent, 0.12)} 0%, transparent 48%)
+            radial-gradient(circle at 14% 12%, ${hexToRgba(activePalette.primary, 0.34)} 0%, transparent 48%),
+            radial-gradient(circle at 86% 18%, ${hexToRgba(activePalette.secondary, 0.28)} 0%, transparent 45%),
+            radial-gradient(circle at 50% 88%, ${hexToRgba(activePalette.accent, 0.20)} 0%, transparent 50%)
           `,
         }}
       />
 
+      {/* Motivos cinematográficos decorativos */}
+      <CinemaDecorations />
+
       {/* BARRA SUPERIOR SIEMPRE ACCESIBLE */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07070d]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/15 bg-[#141a34]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-950 shadow-lg transition-colors duration-500"
-              style={{
-                background: `linear-gradient(135deg, ${activePalette.accent}, ${activePalette.primary})`,
-              }}
-            >
-              <Clapperboard className="h-5 w-5" />
-            </div>
+            {!logoFailed ? (
+              <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white/95 p-1 shadow-lg ring-2 ring-amber-300/60">
+                <img
+                  src="./logo.png"
+                  alt="Logo VotaTuPelícula"
+                  onError={() => setLogoFailed(true)}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div
+                className="flex h-11 w-11 items-center justify-center rounded-2xl text-slate-950 shadow-lg ring-2 ring-white/25 transition-colors duration-500"
+                style={{
+                  background: `linear-gradient(135deg, ${activePalette.accent}, ${activePalette.primary})`,
+                }}
+              >
+                <Clapperboard className="h-5 w-5" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-display text-base font-extrabold tracking-tight text-white sm:text-lg">
                   VotaTuPelícula
                 </span>
                 {IS_SANDBOX_MODE && (
-                  <span className="hidden rounded-full border border-amber-400/35 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 sm:inline-block">
+                  <span className="hidden rounded-full border border-amber-300/45 bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-200 sm:inline-block">
                     Modo Demo Local
                   </span>
                 )}
               </div>
-              <p className="hidden text-[11px] text-slate-400 sm:block">
-                CineFórum Democrático · Educación Secundaria (ESO)
+              <p className="hidden text-[11px] text-sky-200/80 sm:block">
+                🎬 CineFórum Democrático · Educación Secundaria (ESO)
               </p>
             </div>
           </div>
@@ -184,16 +202,16 @@ export function App() {
             <button
               type="button"
               onClick={() => setCivicModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/35 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-200 transition hover:bg-sky-500/25"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300/45 bg-sky-400/20 px-3 py-2 text-xs font-bold text-sky-100 shadow-sm transition hover:bg-sky-400/30"
             >
-              <HelpCircle className="h-4 w-4 text-sky-300" />
+              <HelpCircle className="h-4 w-4 text-sky-200" />
               <span>¿Cómo funciona tu voto?</span>
             </button>
 
             <button
               type="button"
               onClick={() => setAdminModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/10"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
             >
               <Lock className="h-3.5 w-3.5 text-amber-300" />
               <span className="hidden sm:inline">Profesorado / Resultados</span>
@@ -204,88 +222,99 @@ export function App() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:pb-16">
-        {/* HERO DE CARTELERA */}
-        <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md sm:p-7">
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div className="max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
-                  style={{
-                    borderColor: hexToRgba(activePalette.accent, 0.45),
-                    backgroundColor: hexToRgba(activePalette.accent, 0.14),
-                    color: '#fde68a',
-                  }}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Voto Preferencial · Recuento Borda
-                </span>
-                {settings && !settings.voting_open && (
-                  <span className="rounded-full border border-rose-500/40 bg-rose-500/15 px-3 py-1 text-xs font-bold text-rose-300">
-                    Urna cerrada
-                  </span>
-                )}
-              </div>
+        {/* HERO DE CARTELERA CON TIRA DE CINE */}
+        <section className="cinema-marquee mb-8 overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-[#1d2549]/95 via-[#181f3d]/90 to-[#241b42]/95 backdrop-blur-md">
+          <FilmStripDivider />
 
-              <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                {settings?.campaign_title || 'CineFórum ESO · Votación de Cartelera'}
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300 sm:text-base">
-                {settings?.subtitle ||
-                  'Elige y ordena tus películas favoritas. Todas tus preferencias suman puntos.'}
-              </p>
-            </div>
-
-            {/* Leyenda de puntuación Borda vigente */}
-            <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/35 p-3.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Valor de tu TOP {topK}
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {weights.map((w) => (
+          <div className="p-5 sm:p-7">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+              <div className="max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2">
                   <span
-                    key={w.rank}
-                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-xs font-bold text-amber-300"
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
+                    style={{
+                      borderColor: hexToRgba(activePalette.accent, 0.55),
+                      backgroundColor: hexToRgba(activePalette.accent, 0.2),
+                      color: '#fef08a',
+                    }}
                   >
-                    {w.rank}º = {w.points} {w.points === 1 ? 'pt' : 'pts'}
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Voto Preferencial · Recuento Borda
                   </span>
-                ))}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-rose-300/35 bg-rose-400/15 px-3 py-1 text-xs font-bold text-rose-200">
+                    <Popcorn className="h-3.5 w-3.5" />
+                    ¡Elige tu TOP {topK}!
+                  </span>
+                  {settings && !settings.voting_open && (
+                    <span className="rounded-full border border-rose-500/45 bg-rose-500/20 px-3 py-1 text-xs font-bold text-rose-200">
+                      Urna cerrada
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                  {settings?.campaign_title || 'CineFórum ESO · Votación de Cartelera'}
+                </h1>
+                <p className="mt-2 text-sm leading-relaxed text-slate-200 sm:text-base">
+                  {settings?.subtitle ||
+                    'Elige y ordena tus películas favoritas. Todas tus preferencias suman puntos.'}
+                </p>
+              </div>
+
+              {/* Leyenda de puntuación Borda vigente */}
+              <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-black/25 p-3.5 backdrop-blur-sm">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-200">
+                  <Film className="h-3.5 w-3.5" />
+                  Valor de tu TOP {topK}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {weights.map((w) => (
+                    <span
+                      key={w.rank}
+                      className="rounded-xl border border-amber-300/30 bg-amber-400/15 px-2.5 py-1 font-mono text-xs font-bold text-amber-200"
+                    >
+                      {w.rank}º = {w.points} {w.points === 1 ? 'pt' : 'pts'}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
+
+            {/* Barra de filtro rápido */}
+            {movies.length > 0 && (
+              <div className="mt-6 flex flex-col gap-3 border-t border-white/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-sky-200/70" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar título, género o tema…"
+                    className="w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-300 focus:border-amber-300 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {allGenres.map((genre) => (
+                    <button
+                      key={genre}
+                      type="button"
+                      onClick={() => setSelectedGenre(genre)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                        selectedGenre === genre
+                          ? 'bg-amber-300 text-slate-950 shadow'
+                          : 'border border-white/15 bg-white/10 text-slate-100 hover:bg-white/20'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Barra de filtro rápido */}
-          {movies.length > 0 && (
-            <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar título, género o tema…"
-                  className="w-full rounded-xl border border-white/15 bg-black/40 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {allGenres.map((genre) => (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => setSelectedGenre(genre)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                      selectedGenre === genre
-                        ? 'bg-white text-slate-950'
-                        : 'border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-                    }`}
-                  >
-                    {genre}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <FilmStripDivider />
         </section>
 
         {/* ESTADO DE CARGA / ERROR */}
