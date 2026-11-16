@@ -123,6 +123,71 @@ const TAG_DICTIONARY: Array<TrilingualText> = [
   { es: 'Paz', va: 'Pau', en: 'Peace' },
   { es: 'Misterio juvenil', va: 'Misteri juvenil', en: 'Teen mystery' },
   { es: 'Descubrimiento', va: 'Descobriment', en: 'Discovery' },
+  // Keywords frecuentes de TMDB / IMDb
+  { es: 'Basada en un libro', va: 'Basada en un llibre', en: 'Based on novel or book' },
+  { es: 'Basada en un cómic', va: 'Basada en un còmic', en: 'Based on comic' },
+  { es: 'Basada en un videojuego', va: 'Basada en un videojoc', en: 'Based on video game' },
+  { es: 'Basada en una obra teatral', va: 'Basada en una obra teatral', en: 'Based on play or musical' },
+  { es: 'Caballos', va: 'Cavalls', en: 'Horse' },
+  { es: 'Festividades', va: 'Festivitats', en: 'Holiday' },
+  { es: 'Navidad', va: 'Nadal', en: 'Christmas' },
+  { es: 'Nochebuena', va: 'Nit de Nadal', en: 'Christmas Eve' },
+  { es: 'Halloween', va: 'Halloween', en: 'Halloween' },
+  { es: 'Año Nuevo', va: 'Cap d’Any', en: 'New Year' },
+  { es: 'Portland (Oregón)', va: 'Portland (Oregon)', en: 'Portland, Oregon' },
+  { es: 'Londres (Inglaterra)', va: 'Londres (Anglaterra)', en: 'London, England' },
+  { es: 'París (Francia)', va: 'París (França)', en: 'Paris, France' },
+  { es: 'Tokio (Japón)', va: 'Tòquio (Japó)', en: 'Tokyo, Japan' },
+  { es: 'Los Ángeles (California)', va: 'Los Angeles (Califòrnia)', en: 'Los Angeles, California' },
+  { es: 'Nueva York (EE. UU.)', va: 'Nova York (EUA)', en: 'New York City' },
+  { es: 'Madrid (España)', va: 'Madrid (Espanya)', en: 'Madrid, Spain' },
+  { es: 'Bosque', va: 'Bosc', en: 'Forest' },
+  { es: 'Venganza', va: 'Venjança', en: 'Revenge' },
+  { es: 'Fantasmas', va: 'Fantasmes', en: 'Ghost' },
+  { es: 'Monstruos', va: 'Monstres', en: 'Monster' },
+  { es: 'Extraterrestres', va: 'Extraterrestres', en: 'Alien' },
+  { es: 'Dragones', va: 'Dracs', en: 'Dragon' },
+  { es: 'Piratas', va: 'Pirates', en: 'Pirate' },
+  { es: 'Tesoro', va: 'Tresor', en: 'Treasure' },
+  { es: 'Detective', va: 'Detectiu', en: 'Detective' },
+  { es: 'Escuela', va: 'Escola', en: 'School' },
+  { es: 'Profesorado', va: 'Professorat', en: 'Teacher' },
+  { es: 'Acoso escolar', va: 'Assetjament escolar', en: 'Bullying' },
+  { es: 'Cambio climático', va: 'Canvi climàtic', en: 'Climate change' },
+  { es: 'Relaciones familiares', va: 'Relacions familiars', en: 'Family relationships' },
+  { es: 'Perdidos', va: 'Perduts', en: 'Lost' },
+  { es: 'Aventura épica', va: 'Aventura èpica', en: 'Quest' },
+  { es: 'Futuro postapocalíptico', va: 'Futur postapocalíptic', en: 'Post-apocalyptic future' },
+  { es: 'Juvenil', va: 'Juvenil', en: 'Young adult' },
+  { es: 'Adolescente', va: 'Adolescent', en: 'Teenager' },
+  { es: 'Stop motion', va: 'Stop-motion', en: 'Stop motion' },
+  { es: 'Precuela', va: 'Preqüela', en: 'Prequel' },
+  { es: 'Reinicio', va: 'Reinici', en: 'Reboot' },
+  { es: 'Nueva versión', va: 'Nova versió', en: 'Remake' },
+  { es: 'Escena poscréditos', va: 'Escena postcrèdits', en: 'Aftercreditsstinger' },
+  { es: 'Escena entre créditos', va: 'Escena entre crèdits', en: 'Duringcreditsstinger' },
+  { es: 'Directora de cine', va: 'Directora de cinema', en: 'Woman director' },
+  { es: 'Redención', va: 'Redempció', en: 'Redemption' },
+  { es: 'Codicia', va: 'Cobdícia', en: 'Greed' },
+  { es: 'Generosidad', va: 'Generositat', en: 'Generosity' },
+  { es: 'Criaturas mágicas', va: 'Criatures màgiques', en: 'Magical creature' },
+  { es: 'Mundo paralelo', va: 'Món paral·lel', en: 'Alternate universe' },
+  { es: 'Superpoderes', va: 'Superpoders', en: 'Superpower' },
+  { es: 'Batalla final', va: 'Batalla final', en: 'Final battle' },
+  { es: 'Juegos de supervivencia', va: 'Jocs de supervivència', en: 'Death game' },
+  { es: 'Rebelión', va: 'Rebel·lió', en: 'Rebellion' },
+  { es: 'Autoritarismo', va: 'Autoritarisme', en: 'Totalitarianism' },
+  { es: 'Perro', va: 'Gos', en: 'Dog' },
+  { es: 'Gato', va: 'Gat', en: 'Cat' },
+  { es: 'Océano', va: 'Oceà', en: 'Ocean' },
+  { es: 'Isla', va: 'Illa', en: 'Island' },
+  { es: 'Música en vivo', va: 'Música en directe', en: 'Concert' },
+  { es: 'Salud', va: 'Salut', en: 'Health' },
+  { es: 'Superviviente', va: 'Supervivent', en: 'Survivor' },
+  { es: 'Mitología', va: 'Mitologia', en: 'Mythology' },
+  { es: 'Leyenda', va: 'Llegenda', en: 'Legend' },
+  { es: 'Robots', va: 'Robots', en: 'Robot' },
+  { es: 'Ciborg', va: 'Cíborg', en: 'Cyborg' },
 ];
 
 function normalizeKey(value: string): string {
@@ -144,12 +209,95 @@ TAG_LOOKUP.set('sci-fi', {
   va: 'Ciència-ficció',
   en: 'Science Fiction',
 });
+TAG_LOOKUP.set('based on novel', {
+  es: 'Basada en un libro',
+  va: 'Basada en un llibre',
+  en: 'Based on novel or book',
+});
+TAG_LOOKUP.set('based on book', {
+  es: 'Basada en un libro',
+  va: 'Basada en un llibre',
+  en: 'Based on novel or book',
+});
+TAG_LOOKUP.set('based on true story', {
+  es: 'Hechos reales',
+  va: 'Fets reals',
+  en: 'Based on a true story',
+});
+TAG_LOOKUP.set('based on comic book', {
+  es: 'Basada en un cómic',
+  va: 'Basada en un còmic',
+  en: 'Based on comic',
+});
+TAG_LOOKUP.set('horses', {
+  es: 'Caballos',
+  va: 'Cavalls',
+  en: 'Horse',
+});
+TAG_LOOKUP.set('holidays', {
+  es: 'Festividades',
+  va: 'Festivitats',
+  en: 'Holiday',
+});
+TAG_LOOKUP.set('dystopian', {
+  es: 'Distopía',
+  va: 'Distopia',
+  en: 'Dystopia',
+});
+
+const PLACE_SUFFIX_MAP: Record<string, TrilingualText> = {
+  england: { es: 'Inglaterra', va: 'Anglaterra', en: 'England' },
+  uk: { es: 'Reino Unido', va: 'Regne Unit', en: 'UK' },
+  'united kingdom': { es: 'Reino Unido', va: 'Regne Unit', en: 'United Kingdom' },
+  usa: { es: 'EE. UU.', va: 'EUA', en: 'USA' },
+  france: { es: 'Francia', va: 'França', en: 'France' },
+  spain: { es: 'España', va: 'Espanya', en: 'Spain' },
+  japan: { es: 'Japón', va: 'Japó', en: 'Japan' },
+  italy: { es: 'Italia', va: 'Itàlia', en: 'Italy' },
+  germany: { es: 'Alemania', va: 'Alemanya', en: 'Germany' },
+  oregon: { es: 'Oregón', va: 'Oregon', en: 'Oregon' },
+  california: { es: 'California', va: 'Califòrnia', en: 'California' },
+  texas: { es: 'Texas', va: 'Texas', en: 'Texas' },
+  scotland: { es: 'Escocia', va: 'Escòcia', en: 'Scotland' },
+  ireland: { es: 'Irlanda', va: 'Irlanda', en: 'Ireland' },
+};
+
+function capitalizeWords(text: string): string {
+  return text
+    .trim()
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
+    .join(' ');
+}
 
 export function translateGenreOrTag(raw: string, lang: AppLanguage): string {
   const clean = raw.trim();
   if (!clean) return '';
-  const match = TAG_LOOKUP.get(normalizeKey(clean));
+  const norm = normalizeKey(clean);
+  const match = TAG_LOOKUP.get(norm);
   if (match) return match[lang];
+
+  // Patrón "based on <X>" de TMDB / IMDb
+  if (norm.startsWith('based on ')) {
+    const rest = clean.slice(9).trim();
+    const translatedRest = translateGenreOrTag(rest, lang);
+    if (lang === 'es') return `Basada en ${translatedRest.toLowerCase()}`;
+    if (lang === 'va') return `Basada en ${translatedRest.toLowerCase()}`;
+    return `Based on ${rest}`;
+  }
+
+  // Patrón "ciudad, país/estado" (ej. "Portland, oregon", "London, england")
+  if (clean.includes(',')) {
+    const parts = clean.split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 2) {
+      const city = capitalizeWords(parts[0]);
+      const regionNorm = normalizeKey(parts[1]);
+      const regionMatch = PLACE_SUFFIX_MAP[regionNorm];
+      const regionText = regionMatch ? regionMatch[lang] : capitalizeWords(parts[1]);
+      return lang === 'en' ? `${city}, ${regionText}` : `${city} (${regionText})`;
+    }
+  }
+
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
@@ -223,6 +371,60 @@ export function getMovieTrailersMap(movie: Movie): MovieTrailers {
     va: sanitizeSafeHttpUrl(fromMovie.va) || sanitizeSafeHttpUrl(fromPalette.va) || '',
     en: sanitizeSafeHttpUrl(fromMovie.en) || sanitizeSafeHttpUrl(fromPalette.en) || '',
   };
+}
+
+export function localizeCampaignTitle(
+  rawTitle: string | null | undefined,
+  lang: AppLanguage
+): string {
+  const clean = (rawTitle || '').trim();
+  if (!clean) return UI_TEXT[lang].defaultCampaignTitle;
+
+  const norm = normalizeKey(clean);
+  if (
+    norm === 'cineforum eso · votacion de cartelera' ||
+    norm === 'cineforum eso - votacion de cartelera' ||
+    norm === 'cine eso · votacion de cartelera'
+  ) {
+    if (norm.startsWith('cine eso')) {
+      return lang === 'va'
+        ? 'Cine ESO · Votació de Cartellera'
+        : lang === 'en'
+          ? 'School Cinema · Official Selection'
+          : clean;
+    }
+    return UI_TEXT[lang].defaultCampaignTitle;
+  }
+
+  if (lang === 'va') {
+    return clean
+      .replace(/votación de cartelera/gi, 'Votació de Cartellera')
+      .replace(/selección oficial/gi, 'Selecció Oficial');
+  }
+  if (lang === 'en') {
+    return clean
+      .replace(/votación de cartelera/gi, 'Official Selection')
+      .replace(/cartelera/gi, 'Lineup');
+  }
+  return clean;
+}
+
+export function localizeCampaignSubtitle(
+  rawSubtitle: string | null | undefined,
+  lang: AppLanguage
+): string {
+  const clean = (rawSubtitle || '').trim();
+  if (!clean) return UI_TEXT[lang].defaultCampaignSubtitle;
+
+  const norm = normalizeKey(clean);
+  if (
+    norm === 'elige y ordena tus peliculas favoritas. todas tus preferencias suman puntos.' ||
+    norm === 'ordena tus peliculas favoritas. en este sistema todas tus preferencias cuentan.' ||
+    norm === 'ordena tus peliculas favoritas. todas tus preferencias suman puntos.'
+  ) {
+    return UI_TEXT[lang].defaultCampaignSubtitle;
+  }
+  return clean;
 }
 
 export function resolveMovieTrailer(

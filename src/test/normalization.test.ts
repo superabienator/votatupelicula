@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import {
+  localizeCampaignSubtitle,
+  localizeCampaignTitle,
+  translateGenreOrTag,
+} from '../i18n/translations';
 import { getReadableTextColor } from '../utils/colorExtractor';
 import {
   buildStudentFingerprint,
@@ -31,6 +36,25 @@ describe('Normalización de identidad y antifraude', () => {
     expect(sanitizeHexColor('url(evil)', '#6366f1')).toBe('#6366f1');
     expect(getReadableTextColor('#312e81')).toBe('#ffffff');
     expect(getReadableTextColor('#facc15')).toBe('#020617');
+  });
+
+  it('traduce etiquetas de TMDB/IMDb y cabeceras de campaña en ES, VA y EN', () => {
+    expect(translateGenreOrTag('Based on novel or book', 'es')).toBe('Basada en un libro');
+    expect(translateGenreOrTag('Based on novel or book', 'va')).toBe('Basada en un llibre');
+    expect(translateGenreOrTag('Portland, oregon', 'es')).toBe('Portland (Oregón)');
+    expect(translateGenreOrTag('Portland, oregon', 'en')).toBe('Portland, Oregon');
+    expect(translateGenreOrTag('London, england', 'va')).toBe('Londres (Anglaterra)');
+    expect(translateGenreOrTag('Holiday', 'es')).toBe('Festividades');
+    expect(translateGenreOrTag('Horse', 'va')).toBe('Cavalls');
+    expect(localizeCampaignTitle('Cine ESO · Votación de Cartelera', 'en')).toBe(
+      'School Cinema · Official Selection'
+    );
+    expect(
+      localizeCampaignSubtitle(
+        'Ordena tus películas favoritas. En este sistema todas tus preferencias cuentan.',
+        'en'
+      )
+    ).toBe('Pick and rank your favorite movies. Every single preference adds points.');
   });
 
   it('elimina tildes, diacríticos y espacios dobles en nombre y apellidos', () => {

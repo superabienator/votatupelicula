@@ -24,7 +24,11 @@ import { RankingDock } from './components/RankingDock';
 import { TrailerPlayerModal } from './components/TrailerPlayerModal';
 import { VoterAuthModal } from './components/VoterAuthModal';
 import { useI18n } from './i18n/I18nContext';
-import { LANGUAGE_LABELS } from './i18n/translations';
+import {
+  LANGUAGE_LABELS,
+  localizeCampaignSubtitle,
+  localizeCampaignTitle,
+} from './i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from './services/api';
 import type {
   AppLanguage,
@@ -337,10 +341,10 @@ export function App() {
                 </div>
 
                 <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                  {settings?.campaign_title || t.defaultCampaignTitle}
+                  {localizeCampaignTitle(settings?.campaign_title, lang)}
                 </h1>
                 <p className="mt-2 text-sm leading-relaxed text-slate-200 sm:text-base">
-                  {settings?.subtitle || t.defaultCampaignSubtitle}
+                  {localizeCampaignSubtitle(settings?.subtitle, lang)}
                 </p>
               </div>
 
@@ -532,7 +536,7 @@ export function App() {
 
       <CinemaTicketModal
         open={ticketModalOpen}
-        campaignTitle={settings?.campaign_title || t.footerBrand}
+        campaignTitle={localizeCampaignTitle(settings?.campaign_title, lang)}
         rankedMovies={rankedMovies}
         topK={topK}
         scoringMode={scoringMode}

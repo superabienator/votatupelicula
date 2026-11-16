@@ -300,7 +300,7 @@ Dada esta película:
 - Sinopsis base: ${draft.synopsis}
 - Tags base: ${draft.tags.join(', ')}
 
-Devuelve EXCLUSIVAMENTE un JSON válido con textos juveniles sin spoilers (máximo 240 caracteres cada sinopsis) y 3 etiquetas temáticas traducidas a los tres idiomas (castellano "es", valencià "va" e inglés "en"):
+Devuelve EXCLUSIVAMENTE un JSON válido con textos juveniles sin spoilers (máximo 240 caracteres cada sinopsis), géneros y 3 etiquetas temáticas traducidas obligatoriamente a los tres idiomas (castellano "es", valencià "va" e inglés "en", sin dejar ninguna etiqueta en otro idioma):
 {
   ${hasBaseMetadata ? '' : '"title": "Título oficial",\n  "year": 2014,\n  "duration_minutes": 120,\n  "age_rating": "+12",'}
   "palette": { "primary": "#RRGGBB", "secondary": "#RRGGBB", "accent": "#RRGGBB" },
