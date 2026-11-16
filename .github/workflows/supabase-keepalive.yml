@@ -1,0 +1,33 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Todos los lunes a las 08:00 UTC para evitar que Supabase pause el proyecto por inactividad
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Error: Configura los secrets SUPABASE_URL y SUPABASE_ANON_KEY en GitHub (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+
+          BASE_URL="${SUPABASE_URL%/}"
+          HTTP_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$BASE_URL/rest/v1/")
+
+          echo "Supabase REST API respondió con HTTP $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Error: Ping fallido contra Supabase."
+            exit 1
+          fi

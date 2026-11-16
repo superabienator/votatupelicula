@@ -21,6 +21,18 @@ export interface SendOtpEmailResult {
   error?: string;
 }
 
+interface DispatchEmailRequest {
+  to: string;
+  toName: string;
+  subject: string;
+  html: string;
+  text: string;
+  campaignTitle: string;
+  gasPayload: Record<string, unknown>;
+  devLogMessage: string;
+  devOtpPreview?: string;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
@@ -46,127 +58,6 @@ function buildEmailHtml(params: SendOtpEmailParams): string {
       </p>
     </div>
   `.trim();
-}
-
-export async function sendOtpEmail(
-  params: SendOtpEmailParams
-): Promise<SendOtpEmailResult> {
-  const gasWebhookUrl = Deno.env.get('GAS_EMAIL_WEBHOOK_URL')?.trim();
-  const gasSecret = Deno.env.get('GAS_WEBHOOK_SECRET')?.trim();
-
-  // Opción 1 (0€ sin dominio propio): Google Apps Script + Gmail / Google Workspace Edu
-  if (gasWebhookUrl && gasSecret) {
-    const res = await fetch(gasWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret: gasSecret,
-        to: params.to,
-        code: params.code,
-        studentName: params.studentName,
-        campaignTitle: params.campaignTitle,
-      }),
-    });
-
-    if (!res.ok) {
-      return {
-        sent: false,
-        provider: 'gas-gmail',
-        error: `Error del relay de Gmail (${res.status}).`,
-      };
-    }
-
-    const data = await res.json().catch(() => ({ ok: false }));
-    if (!data.ok) {
-      return {
-        sent: false,
-        provider: 'gas-gmail',
-        error: data.error || 'Google Apps Script rechazó el envío.',
-      };
-    }
-
-    return { sent: true, provider: 'gas-gmail' };
-  }
-
-  // Opción 2 (0€, 300 emails/día sin dominio propio obligatorio): Brevo API
-  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
-  const senderEmail = Deno.env.get('MAIL_FROM_EMAIL')?.trim();
-  const senderName =
-    Deno.env.get('MAIL_FROM_NAME')?.trim() || params.campaignTitle;
-
-  if (brevoKey && senderEmail) {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': brevoKey,
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: params.to, name: params.studentName }],
-        subject: `Tu código de votación (${params.code}) · ${params.campaignTitle}`,
-        htmlContent: buildEmailHtml(params),
-        textContent: `Tu código de votación para ${params.campaignTitle} es: ${params.code}. Válido 10 minutos.`,
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return {
-        sent: false,
-        provider: 'brevo',
-        error: `Brevo falló (${res.status}): ${errText}`,
-      };
-    }
-
-    return { sent: true, provider: 'brevo' };
-  }
-
-  // Opción 3 (0€, 100 emails/día con dominio verificado): Resend API
-  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
-  if (resendKey && senderEmail) {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from: `${senderName} <${senderEmail}>`,
-        to: [params.to],
-        subject: `Tu código de votación (${params.code}) · ${params.campaignTitle}`,
-        html: buildEmailHtml(params),
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return {
-        sent: false,
-        provider: 'resend',
-        error: `Resend falló (${res.status}): ${errText}`,
-      };
-    }
-
-    return { sent: true, provider: 'resend' };
-  }
-
-  // Opción 4: Modo desarrollo explícito (solo si OTP_DEV_MODE=true)
-  if (Deno.env.get('OTP_DEV_MODE') === 'true') {
-    console.warn(`[OTP_DEV_MODE] Código OTP para ${params.to}: ${params.code}`);
-    return {
-      sent: true,
-      provider: 'dev-console',
-      devOtpPreview: params.code,
-    };
-  }
-
-  return {
-    sent: false,
-    provider: 'dev-console',
-    error:
-      'No hay proveedor de correo configurado (GAS_EMAIL_WEBHOOK_URL, BREVO_API_KEY o RESEND_API_KEY).',
-  };
 }
 
 function buildReceiptHtml(params: SendVoteReceiptParams): string {
@@ -199,26 +90,91 @@ function buildReceiptHtml(params: SendVoteReceiptParams): string {
   `.trim();
 }
 
-export async function sendVoteReceiptEmail(
-  params: SendVoteReceiptParams
+/**
+ * Envía un correo mediante el proveedor configurado en los secretos de Supabase.
+ * Prioriza APIs dedicadas (Resend, Brevo) antes del relay opcional de Apps Script.
+ */
+async function dispatchEmail(
+  req: DispatchEmailRequest
 ): Promise<SendOtpEmailResult> {
+  const senderEmail = Deno.env.get('MAIL_FROM_EMAIL')?.trim();
+  const senderName =
+    Deno.env.get('MAIL_FROM_NAME')?.trim() || req.campaignTitle;
+  const replyTo = Deno.env.get('MAIL_REPLY_TO')?.trim();
+
+  // Opción 1 (Recomendada): Resend API con API key dedicada
+  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  if (resendKey) {
+    const resendFrom = senderEmail || 'onboarding@resend.dev';
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from: `${senderName} <${resendFrom}>`,
+        to: [req.to],
+        subject: req.subject,
+        html: req.html,
+        text: req.text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        sent: false,
+        provider: 'resend',
+        error: `Resend falló (${res.status})${errText ? `: ${errText}` : '.'}`,
+      };
+    }
+
+    return { sent: true, provider: 'resend' };
+  }
+
+  // Opción 2: Brevo API (300 emails/día)
+  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
+  if (brevoKey && senderEmail) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': brevoKey,
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: req.to, name: req.toName }],
+        subject: req.subject,
+        htmlContent: req.html,
+        textContent: req.text,
+        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        sent: false,
+        provider: 'brevo',
+        error: `Brevo falló (${res.status})${errText ? `: ${errText}` : '.'}`,
+      };
+    }
+
+    return { sent: true, provider: 'brevo' };
+  }
+
+  // Opción 3: Google Apps Script + Gmail / Google Workspace Edu
   const gasWebhookUrl = Deno.env.get('GAS_EMAIL_WEBHOOK_URL')?.trim();
   const gasSecret = Deno.env.get('GAS_WEBHOOK_SECRET')?.trim();
-
   if (gasWebhookUrl && gasSecret) {
     const res = await fetch(gasWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret: gasSecret,
-        type: 'vote_receipt',
-        to: params.to,
-        code: params.auditHash,
-        auditHash: params.auditHash,
-        curso: params.curso,
-        rankedTitles: params.rankedTitles,
-        studentName: params.studentName,
-        campaignTitle: params.campaignTitle,
+        ...req.gasPayload,
       }),
     });
 
@@ -235,76 +191,82 @@ export async function sendVoteReceiptEmail(
       return {
         sent: false,
         provider: 'gas-gmail',
-        error: data.error || 'Google Apps Script rechazó el envío del comprobante.',
+        error: data.error || 'Google Apps Script rechazó el envío.',
       };
     }
+
     return { sent: true, provider: 'gas-gmail' };
   }
 
-  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
-  const senderEmail = Deno.env.get('MAIL_FROM_EMAIL')?.trim();
-  const senderName =
-    Deno.env.get('MAIL_FROM_NAME')?.trim() || params.campaignTitle;
+  // Opción 4: Modo desarrollo explícito (solo si OTP_DEV_MODE=true)
+  if (Deno.env.get('OTP_DEV_MODE') === 'true') {
+    console.warn(req.devLogMessage);
+    return {
+      sent: true,
+      provider: 'dev-console',
+      ...(req.devOtpPreview ? { devOtpPreview: req.devOtpPreview } : {}),
+    };
+  }
 
+  return {
+    sent: false,
+    provider: 'dev-console',
+    error:
+      'No hay proveedor de correo configurado (RESEND_API_KEY, BREVO_API_KEY o GAS_EMAIL_WEBHOOK_URL).',
+  };
+}
+
+export async function sendOtpEmail(
+  params: SendOtpEmailParams
+): Promise<SendOtpEmailResult> {
+  return dispatchEmail({
+    to: params.to,
+    toName: params.studentName,
+    subject: `Tu código de votación (${params.code}) · ${params.campaignTitle}`,
+    html: buildEmailHtml(params),
+    text: `Tu código de votación para ${params.campaignTitle} es: ${params.code}. Válido 10 minutos (máximo 3 intentos).`,
+    campaignTitle: params.campaignTitle,
+    gasPayload: {
+      to: params.to,
+      code: params.code,
+      studentName: params.studentName,
+      campaignTitle: params.campaignTitle,
+    },
+    devLogMessage: `[OTP_DEV_MODE] Código OTP para ${params.to}: ${params.code}`,
+    devOtpPreview: params.code,
+  });
+}
+
+export async function sendVoteReceiptEmail(
+  params: SendVoteReceiptParams
+): Promise<SendOtpEmailResult> {
   const plainOrder = params.rankedTitles
     .map((t, i) => `${i + 1}. ${t}`)
     .join('\n');
+
   const textContent =
     `Confirmación de voto · ${params.campaignTitle}\n` +
     `Código de auditoría: ${params.auditHash}\n` +
     `Curso: ${params.curso}\n\nOrden guardado:\n${plainOrder}\n\n` +
     `Puedes comprobar este hash en la sección "Estado de la votación" para auditar que tu voto figura en el escrutinio sin mostrar tu identidad pública.`;
 
-  if (brevoKey && senderEmail) {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': brevoKey,
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: params.to, name: params.studentName }],
-        subject: `Comprobante de voto (${params.auditHash}) · ${params.campaignTitle}`,
-        htmlContent: buildReceiptHtml(params),
-        textContent,
-      }),
-    });
-    if (!res.ok) {
-      return { sent: false, provider: 'brevo', error: `Brevo falló (${res.status}).` };
-    }
-    return { sent: true, provider: 'brevo' };
-  }
-
-  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
-  if (resendKey && senderEmail) {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendKey}`,
-      },
-      body: JSON.stringify({
-        from: `${senderName} <${senderEmail}>`,
-        to: [params.to],
-        subject: `Comprobante de voto (${params.auditHash}) · ${params.campaignTitle}`,
-        html: buildReceiptHtml(params),
-      }),
-    });
-    if (!res.ok) {
-      return { sent: false, provider: 'resend', error: `Resend falló (${res.status}).` };
-    }
-    return { sent: true, provider: 'resend' };
-  }
-
-  if (Deno.env.get('OTP_DEV_MODE') === 'true') {
-    console.warn(`[OTP_DEV_MODE] Comprobante para ${params.to}: ${params.auditHash}`);
-    return { sent: true, provider: 'dev-console' };
-  }
-
-  return {
-    sent: false,
-    provider: 'dev-console',
-    error: 'No hay proveedor de correo configurado para enviar el comprobante.',
-  };
+  return dispatchEmail({
+    to: params.to,
+    toName: params.studentName,
+    subject: `Comprobante de voto (${params.auditHash}) · ${params.campaignTitle}`,
+    html: buildReceiptHtml(params),
+    text: textContent,
+    campaignTitle: params.campaignTitle,
+    gasPayload: {
+      type: 'vote_receipt',
+      to: params.to,
+      code: params.auditHash,
+      auditHash: params.auditHash,
+      curso: params.curso,
+      rankedTitles: params.rankedTitles,
+      studentName: params.studentName,
+      campaignTitle: params.campaignTitle,
+    },
+    devLogMessage: `[OTP_DEV_MODE] Comprobante para ${params.to}: ${params.auditHash}`,
+  });
 }
