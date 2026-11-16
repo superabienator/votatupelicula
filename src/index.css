@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --theme-primary: #6366f1;
+  --theme-secondary: #ec4899;
+  --theme-accent: #f59e0b;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+}
+
+/* Textura sutil de sala de cine */
+.cinema-noise {
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.04) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+
+/* Muescas circulares para el modal estilo Entrada de Cine */
+.ticket-notch-left,
+.ticket-notch-right {
+  position: relative;
+}
+
+.ticket-notch-left::before,
+.ticket-notch-right::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background-color: #07070d;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+.ticket-notch-left::before {
+  left: -12px;
+}
+
+.ticket-notch-right::after {
+  right: -12px;
+}
+
+/* Scrollbar elegante */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a12;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}

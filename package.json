@@ -1,0 +1,33 @@
+{
+  "name": "votatupelicula",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Plataforma educativa de votación cinematográfica con Voto Preferencial (Borda), antifraude OTP y tematización dinámica para alumnado de ESO.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
+    "framer-motion": "^12.6.2",
+    "lucide-react": "^0.487.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
+  }
+}
