@@ -9,6 +9,7 @@ interface MoviePosterProps {
   palette: MoviePalette;
   className?: string;
   compact?: boolean;
+  priority?: boolean;
 }
 
 export function MoviePoster({
@@ -18,6 +19,7 @@ export function MoviePoster({
   palette,
   className = '',
   compact = false,
+  priority = false,
 }: MoviePosterProps) {
   const [failed, setFailed] = useState(false);
 
@@ -60,7 +62,9 @@ export function MoviePoster({
     <img
       src={posterUrl}
       alt={`Póster de ${title}`}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'auto'}
+      decoding="async"
       onError={() => setFailed(true)}
       className={`object-cover ${className}`}
     />

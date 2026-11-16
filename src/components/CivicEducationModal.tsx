@@ -12,6 +12,7 @@ import {
 import { useState } from 'react';
 import type { ScoringMode } from '../types/cinema';
 import { getScoringWeightsList } from '../utils/borda';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 interface CivicEducationModalProps {
   open: boolean;
@@ -60,6 +61,7 @@ export function CivicEducationModal({
 }: CivicEducationModalProps) {
   const [simSystem, setSimSystem] = useState<SimSystem>('borda');
   const weights = getScoringWeightsList(topK, scoringMode);
+  useEscapeKey(open, onClose);
 
   return (
     <AnimatePresence>

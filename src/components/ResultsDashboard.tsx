@@ -517,7 +517,7 @@ export function ResultsDashboard({
               .map((vote) => (
                 <div
                   key={vote.id}
-                  className="flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-black/30 p-3.5 sm:flex-row sm:items-center"
+                  className="cv-auto flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-black/30 p-3.5 sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">

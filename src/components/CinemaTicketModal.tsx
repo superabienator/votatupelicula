@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Edit3, Film, Sparkles, X } from 'lucide-react';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 
 interface CinemaTicketModalProps {
@@ -23,6 +24,7 @@ export function CinemaTicketModal({
   onBackToEdit,
   onProceedToAuth,
 }: CinemaTicketModalProps) {
+  useEscapeKey(open, onBackToEdit);
   const leadPalette = rankedMovies[0]?.palette ?? {
     primary: '#6366f1',
     secondary: '#ec4899',

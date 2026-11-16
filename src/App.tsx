@@ -1,3 +1,4 @@
+import { MotionConfig } from 'framer-motion';
 import {
   ChevronUp,
   Clapperboard,
@@ -155,6 +156,7 @@ export function App() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="cinema-noise relative min-h-screen overflow-x-hidden bg-[#12172e] text-white">
       {/* Iluminación ambiental luminosa y dinámica derivada de la cartelera */}
       <div
@@ -359,7 +361,7 @@ export function App() {
                 </div>
               ) : (
                 <div className="grid gap-4 xl:grid-cols-2">
-                  {filteredMovies.map((movie) => {
+                  {filteredMovies.map((movie, movieIdx) => {
                     const idx = rankedMovies.findIndex((m) => m.id === movie.id);
                     return (
                       <MovieCard
@@ -372,6 +374,7 @@ export function App() {
                         onInspectMovie={setInspectedMovie}
                         onHoverMovie={setHoveredMovie}
                         disabled={!settings?.voting_open}
+                        priority={movieIdx < 4}
                       />
                     );
                   })}
@@ -500,6 +503,7 @@ export function App() {
         onPublicDataChanged={fetchBallot}
       />
     </div>
+    </MotionConfig>
   );
 }
 

@@ -3,6 +3,7 @@ import { Clock, Film, ShieldCheck, X } from 'lucide-react';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatDuration, getBordaPoints } from '../utils/borda';
 import { hexToRgba } from '../utils/colorExtractor';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 
 interface MovieDetailModalProps {
@@ -22,6 +23,7 @@ export function MovieDetailModal({
   onAssignRank,
   onClose,
 }: MovieDetailModalProps) {
+  useEscapeKey(Boolean(movie), onClose);
   return (
     <AnimatePresence>
       {movie && (

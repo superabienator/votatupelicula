@@ -14,6 +14,7 @@ interface MovieCardProps {
   onInspectMovie: (movie: Movie) => void;
   onHoverMovie?: (movie: Movie | null) => void;
   disabled?: boolean;
+  priority?: boolean;
 }
 
 export function MovieCard({
@@ -25,6 +26,7 @@ export function MovieCard({
   onInspectMovie,
   onHoverMovie,
   disabled = false,
+  priority = false,
 }: MovieCardProps) {
   const medal = assignedRank ? getRankMedal(assignedRank) : null;
   const ranks = Array.from({ length: topK }, (_, i) => i + 1);
@@ -68,6 +70,7 @@ export function MovieCard({
             year={movie.year}
             posterUrl={movie.poster_url}
             palette={movie.palette}
+            priority={priority}
             className="h-full w-full"
           />
           <span className="absolute left-2 top-2 rounded-md border border-white/20 bg-black/70 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white backdrop-blur-sm">

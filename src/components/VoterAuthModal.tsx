@@ -21,6 +21,7 @@ import type {
   VotingSettings,
 } from '../types/cinema';
 import { validateVoterForm } from '../utils/normalization';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 interface VoterAuthModalProps {
   open: boolean;
@@ -56,6 +57,7 @@ export function VoterAuthModal({
   const [receipt, setReceipt] = useState<VoteReceipt | null>(null);
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  useEscapeKey(open && step !== 'success', onClose);
 
   // Reiniciar estado cuando se cierra el modal (en memoria, sin almacenamiento local)
   useEffect(() => {
@@ -246,6 +248,8 @@ export function VoterAuthModal({
                     <input
                       type="text"
                       required
+                      autoComplete="off"
+                      enterKeyHint="next"
                       value={form.nombre}
                       onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                       placeholder="Ej. Lucía"
@@ -259,6 +263,8 @@ export function VoterAuthModal({
                     <input
                       type="text"
                       required
+                      autoComplete="off"
+                      enterKeyHint="next"
                       value={form.apellidos}
                       onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
                       placeholder="Ej. García López"
@@ -294,6 +300,8 @@ export function VoterAuthModal({
                     <input
                       type="email"
                       required
+                      autoComplete="off"
+                      enterKeyHint="send"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       placeholder={
@@ -313,7 +321,11 @@ export function VoterAuthModal({
                 </div>
 
                 {error && (
-                  <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200">
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200"
+                  >
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
                     <span>{error}</span>
                   </div>
@@ -405,7 +417,11 @@ export function VoterAuthModal({
                 </div>
 
                 {error && (
-                  <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200">
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200"
+                  >
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
                     <span>{error}</span>
                   </div>

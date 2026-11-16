@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import { IS_SANDBOX_MODE, cinemaApi } from '../services/api';
 import type { DashboardResults, Movie, VotingSettings } from '../types/cinema';
 import { extractPaletteFromImageCanvas } from '../utils/colorExtractor';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import { MoviePoster } from './MoviePoster';
 import { ResultsDashboard } from './ResultsDashboard';
 
@@ -72,6 +73,8 @@ export function AdminPortalModal({
   // Edición de settings como texto auxiliar
   const [classesText, setClassesText] = useState('');
   const [domainsText, setDomainsText] = useState('');
+
+  useEscapeKey(open && !editingMovie, onClose);
 
   async function loadAdminData(secret: string) {
     const data = await cinemaApi.adminListMovies(secret);
