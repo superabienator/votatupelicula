@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@sentry/react": "^11.14.0",
     "@supabase/supabase-js": "^2.49.4",
     "framer-motion": "^12.6.2",
     "lucide-react": "^0.487.0",
