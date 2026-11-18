@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Edit3, Film, Sparkles, X } from 'lucide-react';
+import { useRef } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { getLocalizedMovie } from '../i18n/translations';
 import type { Movie, ScoringMode } from '../types/cinema';
 import { formatPointsLabel, getBordaPoints, getRankMedal } from '../utils/borda';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 import { MoviePoster } from './MoviePoster';
 
 interface CinemaTicketModalProps {
@@ -27,7 +29,9 @@ export function CinemaTicketModal({
   onProceedToAuth,
 }: CinemaTicketModalProps) {
   const { lang, t } = useI18n();
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEscapeKey(open, onBackToEdit);
+  useModalFocus(open, dialogRef);
   const leadPalette = rankedMovies[0]?.palette ?? {
     primary: '#6366f1',
     secondary: '#ec4899',
@@ -45,10 +49,12 @@ export function CinemaTicketModal({
           onClick={onBackToEdit}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="ticket-title"
-            className="relative max-h-[92vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-[0_30px_80px_rgba(0,0,0,0.85)]"
+            className="relative max-h-[92vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-[0_30px_80px_rgba(0,0,0,0.85)] outline-none"
             initial={{ opacity: 0, scale: 0.9, rotateX: 12, y: 24 }}
             animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 16 }}

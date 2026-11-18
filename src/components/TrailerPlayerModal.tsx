@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ExternalLink, Film, PlayCircle, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import {
   LANGUAGE_LABELS,
@@ -12,6 +12,7 @@ import {
 import type { AppLanguage, Movie } from '../types/cinema';
 import { sanitizeSafeHttpUrl } from '../utils/urlSafety';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 
 interface TrailerPlayerModalProps {
   movie: Movie | null;
@@ -21,8 +22,10 @@ interface TrailerPlayerModalProps {
 export function TrailerPlayerModal({ movie, onClose }: TrailerPlayerModalProps) {
   const { lang, t } = useI18n();
   const [selectedTrailerLang, setSelectedTrailerLang] = useState<AppLanguage>(lang);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEscapeKey(Boolean(movie), onClose);
+  useModalFocus(Boolean(movie), dialogRef);
 
   useEffect(() => {
     if (!movie) return;
@@ -54,10 +57,12 @@ export function TrailerPlayerModal({ movie, onClose }: TrailerPlayerModalProps) 
           onClick={onClose}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="trailer-modal-title"
-            className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] text-white shadow-2xl"
+            className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] text-white shadow-2xl outline-none"
             initial={{ opacity: 0, scale: 0.94, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}

@@ -20,7 +20,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { LANGUAGE_LABELS, getLocalizedMovie, getMovieTrailersMap } from '../i18n/translations';
 import { IS_SANDBOX_MODE, cinemaApi } from '../services/api';
@@ -34,6 +34,7 @@ import type {
 import { extractPaletteFromImageCanvas } from '../utils/colorExtractor';
 import { formatDuration } from '../utils/borda';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 import { MoviePoster } from './MoviePoster';
 import { ResultsDashboard } from './ResultsDashboard';
 
@@ -125,8 +126,10 @@ export function AdminPortalModal({
   const [classesText, setClassesText] = useState('');
   const [domainsText, setDomainsText] = useState('');
 
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEscapeKey(Boolean(editingMovie), () => setEditingMovie(null));
   useEscapeKey(open && !editingMovie && !resultsSubModalOpen, handleClosePortal);
+  useModalFocus(open, dialogRef);
 
   async function loadAdminData(secret: string) {
     const data = await cinemaApi.adminListMovies(secret);
@@ -486,10 +489,12 @@ export function AdminPortalModal({
           exit={{ opacity: 0 }}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={t.adminHeaderTitle}
-            className="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#090c16] text-slate-100 shadow-2xl"
+            className="relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#090c16] text-slate-100 shadow-2xl outline-none"
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -612,6 +617,17 @@ export function AdminPortalModal({
                   <div
                     role="tablist"
                     aria-label={t.adminHeaderTitle}
+                    onKeyDown={(e) => {
+                      const order: readonly AdminTab[] = ['movies', 'results', 'settings'];
+                      const idx = order.indexOf(activeTab);
+                      if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        setActiveTab(order[(idx + 1) % order.length]);
+                      } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        setActiveTab(order[(idx - 1 + order.length) % order.length]);
+                      }
+                    }}
                     className="flex flex-wrap gap-2"
                   >
                     {[
@@ -636,6 +652,7 @@ export function AdminPortalModal({
                       return (
                         <button
                           key={tab.id}
+                          id={`admin-tab-${tab.id}`}
                           type="button"
                           role="tab"
                           aria-selected={active}
@@ -665,7 +682,11 @@ export function AdminPortalModal({
                 </div>
 
                 {/* Cuerpo con scroll */}
-                <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
+                <div
+                  role="tabpanel"
+                  aria-labelledby={`admin-tab-${activeTab}`}
+                  className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6"
+                >
                   {feedback && (
                     <div
                       role={feedback.type === 'err' ? 'alert' : 'status'}

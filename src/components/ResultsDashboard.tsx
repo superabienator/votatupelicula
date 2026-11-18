@@ -1046,19 +1046,27 @@ export function ResultsDashboard({
               </div>
 
               <div className="flex-1 overflow-y-auto overscroll-contain p-5">
-                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/25">
+                <div
+                  tabIndex={0}
+                  role="region"
+                  aria-labelledby="census-modal-title"
+                  className="overflow-x-auto rounded-2xl border border-white/10 bg-black/25"
+                >
                   <table className="w-full text-left text-xs">
+                    <caption className="sr-only">
+                      {tx.censusModalDesc}
+                    </caption>
                     <thead className="border-b border-white/10 bg-white/[0.04] text-[11px] uppercase tracking-wider text-slate-300">
                       <tr>
-                        <th className="px-3 py-2.5">{tx.censusColIndex}</th>
-                        <th className="px-3 py-2.5">{tx.censusColApellidos}</th>
-                        <th className="px-3 py-2.5">{tx.censusColNombre}</th>
-                        <th className="px-3 py-2.5">{tx.censusColCurso}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColIndex}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColApellidos}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColNombre}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColCurso}</th>
                         {censusIncludeEmail && (
-                          <th className="px-3 py-2.5">{tx.censusColEmail}</th>
+                          <th scope="col" className="px-3 py-2.5">{tx.censusColEmail}</th>
                         )}
-                        <th className="px-3 py-2.5">{tx.censusColAuditHash}</th>
-                        <th className="px-3 py-2.5">{tx.censusColTimestamp}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColAuditHash}</th>
+                        <th scope="col" className="px-3 py-2.5">{tx.censusColTimestamp}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">

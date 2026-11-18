@@ -142,6 +142,7 @@ const TAG_DICTIONARY: Array<TrilingualText> = [
   { es: 'Nueva York (EE. UU.)', va: 'Nova York (EUA)', en: 'New York City' },
   { es: 'Madrid (España)', va: 'Madrid (Espanya)', en: 'Madrid, Spain' },
   { es: 'Bosque', va: 'Bosc', en: 'Forest' },
+  { es: 'Misión de rescate', va: 'Missió de rescat', en: 'Rescue mission' },
   { es: 'Venganza', va: 'Venjança', en: 'Revenge' },
   { es: 'Fantasmas', va: 'Fantasmes', en: 'Ghost' },
   { es: 'Monstruos', va: 'Monstres', en: 'Monster' },
@@ -486,6 +487,7 @@ export const UI_TEXT = {
     ptSingular: 'pt',
     ptPlural: 'pts',
     emptyPublished: 'Aún no hay películas publicadas en la cartelera.',
+    billboardSectionHeading: 'Películas en votación',
     retryBtn: 'Reintentar',
     mobileTopStatus: (k: number, count: number) =>
       `Tu TOP ${k}: ${count} / ${k} elegidas`,
@@ -884,6 +886,7 @@ export const UI_TEXT = {
     ptSingular: 'pt',
     ptPlural: 'pts',
     emptyPublished: 'Encara no hi ha pel·lícules publicades a la cartellera.',
+    billboardSectionHeading: 'Pel·lícules en votació',
     retryBtn: 'Reintentar',
     mobileTopStatus: (k: number, count: number) =>
       `El teu TOP ${k}: ${count} / ${k} triades`,
@@ -1283,6 +1286,7 @@ export const UI_TEXT = {
     ptSingular: 'pt',
     ptPlural: 'pts',
     emptyPublished: 'No movies are published in the lineup yet.',
+    billboardSectionHeading: 'Movies on the ballot',
     retryBtn: 'Retry',
     mobileTopStatus: (k: number, count: number) =>
       `Your TOP ${k}: ${count} / ${k} picked`,

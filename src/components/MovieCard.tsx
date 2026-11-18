@@ -158,18 +158,18 @@ export function MovieCard({
             <button
               type="button"
               onClick={() => onInspectMovie(movie)}
-              className="text-[11px] font-semibold text-sky-300 underline-offset-2 hover:underline"
+              className="inline-flex min-h-6 items-center px-1 text-[11px] font-semibold text-sky-300 underline-offset-2 hover:underline"
             >
               {t.seeFullDetails}
             </button>
 
             {trailer.url && trailer.activeLang && (
               <>
-                <span className="text-slate-600">·</span>
+                <span aria-hidden="true" className="text-slate-600">·</span>
                 <button
                   type="button"
                   onClick={() => onWatchTrailer(movie)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-200 transition hover:bg-amber-400/25"
+                  className="inline-flex min-h-6 items-center gap-1 rounded-lg border border-amber-300/35 bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-200 transition hover:bg-amber-400/25"
                 >
                   <PlayCircle className="h-3 w-3" />
                   {t.watchTrailer} ({LANGUAGE_LABELS[trailer.activeLang].code})
@@ -180,7 +180,7 @@ export function MovieCard({
                   rel="noopener noreferrer"
                   title={t.openTrailerExternal}
                   aria-label={`${t.openTrailerExternal} - ${localized.title}`}
-                  className="inline-flex items-center gap-1 text-[11px] text-slate-300 transition hover:text-white"
+                  className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-md text-[11px] text-slate-300 transition hover:bg-white/10 hover:text-white"
                 >
                   <ExternalLink className="h-3 w-3" />
                 </a>

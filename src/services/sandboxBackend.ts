@@ -436,11 +436,11 @@ function buildStandingsAggregate(): PublicStandings {
     });
 
   const fptpWinner =
-    [...leaderboard].sort((a, b) => b.first_choice_votes - a.first_choice_votes)[0] ??
+    leaderboard.toSorted((a, b) => b.first_choice_votes - a.first_choice_votes)[0] ??
     null;
   const bordaWinner = leaderboard[0] ?? null;
   const consensusWinner =
-    [...leaderboard].sort((a, b) => b.top_k_appearances - a.top_k_appearances)[0] ??
+    leaderboard.toSorted((a, b) => b.top_k_appearances - a.top_k_appearances)[0] ??
     null;
 
   return {
@@ -652,7 +652,7 @@ export const sandboxBackend = {
   }> {
     assertAdmin(secret);
     return {
-      movies: [...movies].sort((a, b) => a.display_order - b.display_order),
+      movies: movies.toSorted((a, b) => a.display_order - b.display_order),
       settings: { ...settings },
       total_votes: votes.length,
     };
@@ -802,8 +802,8 @@ export const sandboxBackend = {
             : '';
 
     const movieTitleMap = new Map(movies.map((m) => [m.id, m.title]));
-    const votesLog = [...votes]
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    const votesLog = votes
+      .toSorted((a, b) => b.created_at.localeCompare(a.created_at))
       .map((v) => ({
         id: v.id,
         nombre: v.nombre,

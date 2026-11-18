@@ -16,13 +16,14 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { getLocalizedMovie } from '../i18n/translations';
 import type { Movie, PublicStandings, VotingSettings } from '../types/cinema';
 import { hexToRgba } from '../utils/colorExtractor';
 import { normalizeAuditHash } from '../utils/auditHash';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 import { MoviePoster } from './MoviePoster';
 
 interface PublicStandingsModalProps {
@@ -49,7 +50,9 @@ export function PublicStandingsModal({
   const { lang, t } = useI18n();
   const [auditQuery, setAuditQuery] = useState('');
   const [checkedHash, setCheckedHash] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEscapeKey(open, onClose);
+  useModalFocus(open, dialogRef);
 
   useEffect(() => {
     if (!open) {
@@ -118,10 +121,12 @@ export function PublicStandingsModal({
           onClick={onClose}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="standings-modal-title"
-            className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] p-5 text-white shadow-2xl sm:p-7"
+            className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto overflow-x-hidden overscroll-contain rounded-3xl border border-white/20 bg-[#12172e] p-5 text-white shadow-2xl outline-none sm:p-7"
             initial={{ opacity: 0, scale: 0.94, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -422,12 +427,12 @@ export function PublicStandingsModal({
                                 {item.total_points} {t.ptPlural}
                               </span>
                             </div>
-                            <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
+                            <div className="progress-bar-track h-3 w-full overflow-hidden rounded-full bg-white/10">
                               <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${widthPct}%` }}
                                 transition={{ duration: 0.45 }}
-                                className="h-full rounded-full"
+                                className="progress-bar-fill h-full rounded-full"
                                 style={{
                                   background: `linear-gradient(90deg, ${item.palette.primary}, ${item.palette.accent})`,
                                 }}
@@ -455,12 +460,12 @@ export function PublicStandingsModal({
                                 {t.standingsVotesLabel(cls.count)} ({cls.percentage}%)
                               </span>
                             </div>
-                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                            <div className="progress-bar-track h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                               <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${barPct}%` }}
                                 transition={{ duration: 0.45 }}
-                                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-400"
+                                className="progress-bar-fill h-full rounded-full bg-gradient-to-r from-sky-400 to-indigo-400"
                               />
                             </div>
                           </div>

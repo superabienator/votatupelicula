@@ -11,11 +11,12 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import type { AppLanguage, ScoringMode } from '../types/cinema';
 import { getScoringWeightsList } from '../utils/borda';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 
 interface CivicEducationModalProps {
   open: boolean;
@@ -145,9 +146,11 @@ export function CivicEducationModal({
 }: CivicEducationModalProps) {
   const { lang, t } = useI18n();
   const [simSystem, setSimSystem] = useState<SimSystem>('borda');
+  const dialogRef = useRef<HTMLDivElement>(null);
   const weights = getScoringWeightsList(topK, scoringMode);
   const simMovies = SIM_MOVIES_BY_LANG[lang];
   useEscapeKey(open, onClose);
+  useModalFocus(open, dialogRef);
 
   return (
     <AnimatePresence>
@@ -160,10 +163,12 @@ export function CivicEducationModal({
           onClick={onClose}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="civic-modal-title"
-            className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/15 bg-[#0d101b] p-5 text-slate-100 shadow-2xl sm:p-8"
+            className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/15 bg-[#0d101b] p-5 text-slate-100 shadow-2xl outline-none sm:p-8"
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -335,10 +340,10 @@ export function CivicEducationModal({
             <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h4 className="flex items-center gap-2 font-display text-base font-bold text-white">
+                  <h3 className="flex items-center gap-2 font-display text-base font-bold text-white">
                     <Sparkles className="h-4 w-4 text-amber-400" />
                     {t.simTitle}
-                  </h4>
+                  </h3>
                   <p className="text-xs text-slate-400">
                     {t.simSubtitle}
                   </p>
@@ -347,6 +352,17 @@ export function CivicEducationModal({
                 <div
                   role="tablist"
                   aria-label={t.simTitle}
+                  onKeyDown={(e) => {
+                    const order: readonly SimSystem[] = ['fptp', 'approval', 'borda'];
+                    const idx = order.indexOf(simSystem);
+                    if (e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      setSimSystem(order[(idx + 1) % order.length]);
+                    } else if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      setSimSystem(order[(idx - 1 + order.length) % order.length]);
+                    }
+                  }}
                   className="inline-flex flex-wrap rounded-xl border border-white/10 bg-black/40 p-1"
                 >
                   {(
@@ -358,6 +374,7 @@ export function CivicEducationModal({
                   ).map((tab) => (
                     <button
                       key={tab.id}
+                      id={`sim-tab-${tab.id}`}
                       type="button"
                       role="tab"
                       aria-selected={simSystem === tab.id}
@@ -374,7 +391,11 @@ export function CivicEducationModal({
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div
+                role="tabpanel"
+                aria-labelledby={`sim-tab-${simSystem}`}
+                className="mt-4 space-y-3"
+              >
                 {simMovies.map((movie) => {
                   const value =
                     simSystem === 'fptp'
@@ -406,9 +427,9 @@ export function CivicEducationModal({
                             : `${value}%`}
                         </span>
                       </div>
-                      <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
+                      <div className="progress-bar-track h-3 w-full overflow-hidden rounded-full bg-white/10">
                         <motion.div
-                          className="h-full rounded-full"
+                          className="progress-bar-fill h-full rounded-full"
                           initial={false}
                           animate={{ width: `${value}%` }}
                           transition={{ type: 'spring', stiffness: 220, damping: 24 }}

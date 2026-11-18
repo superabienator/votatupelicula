@@ -158,12 +158,8 @@ describe('Interfaz VotaTuPelícula, idiomas, tráilers y educación cívica', ()
 
     const demoCodeEl = screen.getByTestId('demo-otp-code');
     const code = demoCodeEl.textContent!.trim();
-    const digitInputs = [1, 2, 3, 4].map((n) =>
-      screen.getByLabelText(`Dígito ${n}`)
-    );
-    code.split('').forEach((ch, idx) => {
-      fireEvent.change(digitInputs[idx], { target: { value: ch } });
-    });
+    const otpInput = screen.getByRole('textbox', { name: /Introduce tu código de 4 cifras/i });
+    fireEvent.change(otpInput, { target: { value: code } });
 
     fireEvent.click(screen.getByRole('button', { name: /Validar y registrar voto/i }));
 

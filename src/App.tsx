@@ -12,17 +12,26 @@ import {
   Ticket,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AdminPortalModal } from './components/AdminPortalModal';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CinemaDecorations, FilmStripDivider } from './components/CinemaDecorations';
 import { CinemaTicketModal } from './components/CinemaTicketModal';
-import { CivicEducationModal } from './components/CivicEducationModal';
 import { MovieCard } from './components/MovieCard';
 import { MovieDetailModal } from './components/MovieDetailModal';
-import { PublicStandingsModal } from './components/PublicStandingsModal';
 import { RankingDock } from './components/RankingDock';
 import { TrailerPlayerModal } from './components/TrailerPlayerModal';
 import { VoterAuthModal } from './components/VoterAuthModal';
+
+const AdminPortalModal = lazy(() =>
+  import('./components/AdminPortalModal').then((m) => ({ default: m.AdminPortalModal }))
+);
+const CivicEducationModal = lazy(() =>
+  import('./components/CivicEducationModal').then((m) => ({ default: m.CivicEducationModal }))
+);
+const PublicStandingsModal = lazy(() =>
+  import('./components/PublicStandingsModal').then((m) => ({
+    default: m.PublicStandingsModal,
+  }))
+);
 import { useI18n } from './i18n/I18nContext';
 import {
   LANGUAGE_LABELS,
@@ -168,6 +177,16 @@ export function App() {
     setAuthModalOpen(false);
   }
 
+  const anyModalOpen = Boolean(
+    civicModalOpen ||
+      inspectedMovie ||
+      trailerMovie ||
+      ticketModalOpen ||
+      standingsModalOpen ||
+      authModalOpen ||
+      adminModalOpen
+  );
+
   return (
     <MotionConfig reducedMotion="user">
     <div className="cinema-noise relative min-h-screen overflow-x-clip bg-[#12172e] text-white">
@@ -188,7 +207,10 @@ export function App() {
       <CinemaDecorations />
 
       {/* BARRA SUPERIOR SIEMPRE ACCESIBLE */}
-      <header className="sticky top-0 z-40 border-b border-white/15 bg-[#141a34]/90 backdrop-blur-xl">
+      <header
+        inert={anyModalOpen}
+        className="sticky top-0 z-40 border-b border-white/15 bg-[#141a34]/90 backdrop-blur-xl"
+      >
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 sm:px-6 lg:flex-nowrap lg:py-3">
           <div className="flex items-center gap-3">
             {!logoFailed ? (
@@ -282,7 +304,10 @@ export function App() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 lg:pb-16">
+      <main
+        inert={anyModalOpen}
+        className="relative z-10 mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 lg:pb-16"
+      >
         {/* Aviso legal RGPD / LOPDGDD al cerrar sesión (logout) */}
         {logoutNoticeMode && (
           <div
@@ -427,7 +452,10 @@ export function App() {
         {/* GRID DE PELÍCULAS + DOCK DE RANKING */}
         {!loading && loadError === null && (
           <div className="grid items-start gap-7 lg:grid-cols-[1fr_360px]">
-            <div>
+            <section aria-labelledby="billboard-section-heading">
+              <h2 id="billboard-section-heading" className="sr-only">
+                {t.billboardSectionHeading}
+              </h2>
               {movies.length === 0 ? (
                 <div className="rounded-3xl border border-white/15 bg-white/[0.04] p-10 text-center text-sm text-slate-300">
                   {t.emptyPublished}
@@ -454,7 +482,7 @@ export function App() {
                   })}
                 </div>
               )}
-            </div>
+            </section>
 
             {/* Columna derecha / inferior: Mi TOP */}
             <div ref={dockRef} className="scroll-mt-24 lg:sticky lg:top-24">
@@ -474,9 +502,12 @@ export function App() {
         )}
       </main>
 
-      {/* Barra flotante móvil para saltar rápido a "Mi TOP" o abrir la entrada */}
+      {/* Barra flotante móvil ubicada por encima del badge de Netlify para no quedar oculta */}
       {!loading && movies.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/15 bg-[#12172e]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
+        <div
+          inert={anyModalOpen}
+          className="fixed inset-x-3 bottom-[68px] z-30 rounded-2xl border border-white/20 bg-[#12172e]/95 px-3.5 py-2.5 shadow-2xl backdrop-blur-xl lg:hidden"
+        >
           <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
             <div>
               <p className="font-display text-xs font-bold text-white">
@@ -520,12 +551,14 @@ export function App() {
       )}
 
       {/* MODALES */}
-      <CivicEducationModal
-        open={civicModalOpen}
-        onClose={() => setCivicModalOpen(false)}
-        topK={topK}
-        scoringMode={scoringMode}
-      />
+      <Suspense fallback={null}>
+        <CivicEducationModal
+          open={civicModalOpen}
+          onClose={() => setCivicModalOpen(false)}
+          topK={topK}
+          scoringMode={scoringMode}
+        />
+      </Suspense>
 
       <MovieDetailModal
         movie={inspectedMovie}
@@ -562,19 +595,21 @@ export function App() {
         }}
       />
 
-      <PublicStandingsModal
-        open={standingsModalOpen}
-        onClose={() => {
-          setStandingsModalOpen(false);
-          setStandingsAuditHash(undefined);
-        }}
-        standings={publicStandings}
-        movies={movies}
-        settings={settings}
-        loading={loading || refreshing}
-        onRefresh={() => fetchBallot({ silent: true })}
-        initialAuditHash={standingsAuditHash}
-      />
+      <Suspense fallback={null}>
+        <PublicStandingsModal
+          open={standingsModalOpen}
+          onClose={() => {
+            setStandingsModalOpen(false);
+            setStandingsAuditHash(undefined);
+          }}
+          standings={publicStandings}
+          movies={movies}
+          settings={settings}
+          loading={loading || refreshing}
+          onRefresh={() => fetchBallot({ silent: true })}
+          initialAuditHash={standingsAuditHash}
+        />
+      </Suspense>
 
       {settings && (
         <VoterAuthModal
@@ -600,25 +635,30 @@ export function App() {
         />
       )}
 
-      <AdminPortalModal
-        open={adminModalOpen}
-        onClose={() => {
-          setAdminModalOpen(false);
-          if (isAdminUrl()) {
-            window.history.replaceState({}, '', '/');
-          }
-        }}
-        onAdminLogout={() => {
-          setAdminModalOpen(false);
-          if (isAdminUrl()) {
-            window.history.replaceState({}, '', '/');
-          }
-          setLogoutNoticeMode('admin');
-        }}
-        onPublicDataChanged={() => fetchBallot({ silent: true })}
-      />
+      <Suspense fallback={null}>
+        <AdminPortalModal
+          open={adminModalOpen}
+          onClose={() => {
+            setAdminModalOpen(false);
+            if (isAdminUrl()) {
+              window.history.replaceState({}, '', '/');
+            }
+          }}
+          onAdminLogout={() => {
+            setAdminModalOpen(false);
+            if (isAdminUrl()) {
+              window.history.replaceState({}, '', '/');
+            }
+            setLogoutNoticeMode('admin');
+          }}
+          onPublicDataChanged={() => fetchBallot({ silent: true })}
+        />
+      </Suspense>
 
-      <footer className="relative z-10 mx-auto max-w-7xl px-4 pb-28 pt-2 text-center sm:px-6 lg:pb-10">
+      <footer
+        inert={anyModalOpen}
+        className="relative z-10 mx-auto max-w-7xl px-4 pb-36 pt-2 text-center sm:px-6 lg:pb-10"
+      >
         <p className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-black/25 px-4 py-2 text-[11px] text-slate-300">
           <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
           <span>{t.gdprFooterShort}</span>

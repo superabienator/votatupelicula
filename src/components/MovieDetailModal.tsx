@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, ExternalLink, Film, PlayCircle, ShieldCheck, X } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import {
   LANGUAGE_LABELS,
@@ -12,6 +12,7 @@ import { formatDuration, getBordaPoints } from '../utils/borda';
 import { getReadableTextColor, hexToRgba } from '../utils/colorExtractor';
 import { sanitizeSafeHttpUrl } from '../utils/urlSafety';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 import { MoviePoster } from './MoviePoster';
 
 interface MovieDetailModalProps {
@@ -35,7 +36,9 @@ export function MovieDetailModal({
 }: MovieDetailModalProps) {
   const { lang, t } = useI18n();
   const [backdropFailedUrl, setBackdropFailedUrl] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEscapeKey(Boolean(movie), onClose);
+  useModalFocus(Boolean(movie), dialogRef);
 
   const localized = movie ? getLocalizedMovie(movie, lang) : null;
   const trailer = movie ? resolveMovieTrailer(movie, lang) : null;
@@ -53,10 +56,12 @@ export function MovieDetailModal({
           onClick={onClose}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="movie-detail-title"
-            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-2xl"
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] shadow-2xl outline-none"
             initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}

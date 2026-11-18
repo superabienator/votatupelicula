@@ -111,21 +111,51 @@ p {
   right: -12px;
 }
 
-/* Scrollbar elegante */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Scrollbar elegante (solo en navegadores sin scrollbar-color nativo) */
+@supports not (scrollbar-color: auto) {
+  html {
+    scrollbar-width: auto;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #12172e;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.45);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #12172e;
-}
+/* Soporte de Modo Contraste Alto (Forced Colors Mode) */
+@media (forced-colors: active) {
+  [role="dialog"],
+  article,
+  aside {
+    border: 1px solid CanvasText !important;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
-  border-radius: 9999px;
-}
+  button[aria-pressed="true"],
+  [role="tab"][aria-selected="true"] {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  .progress-bar-track {
+    border: 1px solid CanvasText;
+  }
+
+  .progress-bar-fill {
+    background: Highlight !important;
+    forced-color-adjust: none;
+  }
 }

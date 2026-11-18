@@ -31,6 +31,7 @@ import type {
 import { computeVoteAuditHash } from '../utils/auditHash';
 import { validateVoterForm } from '../utils/normalization';
 import { useEscapeKey } from '../utils/useEscapeKey';
+import { useModalFocus } from '../utils/useModalFocus';
 
 interface VoterAuthModalProps {
   open: boolean;
@@ -65,7 +66,7 @@ export function VoterAuthModal({
   const [error, setError] = useState<string | null>(null);
 
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '']);
+  const [otpCode, setOtpCode] = useState('');
   const [expiresSecondsLeft, setExpiresSecondsLeft] = useState(600);
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(0);
   const [receipt, setReceipt] = useState<VoteReceipt | null>(null);
@@ -74,8 +75,10 @@ export function VoterAuthModal({
   const [receiptSentEmail, setReceiptSentEmail] = useState<string | null>(null);
   const [receiptSendError, setReceiptSendError] = useState<string | null>(null);
 
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const otpInputRef = useRef<HTMLInputElement | null>(null);
   useEscapeKey(open && step !== 'success', onClose);
+  useModalFocus(open, dialogRef);
 
   // Reiniciar estado cuando se cierra el modal (en memoria, sin almacenamiento local)
   useEffect(() => {
@@ -89,7 +92,7 @@ export function VoterAuthModal({
       });
       setError(null);
       setChallenge(null);
-      setOtpDigits(['', '', '', '']);
+      setOtpCode('');
       setExpiresSecondsLeft(600);
       setCooldownSecondsLeft(0);
       setReceipt(null);
@@ -177,51 +180,16 @@ export function VoterAuthModal({
         movie_ids: rankedMovies.map((m) => m.id),
       });
       setChallenge(res);
-      setOtpDigits(['', '', '', '']);
+      setOtpCode('');
       setExpiresSecondsLeft(res.expires_in_seconds || 600);
       setCooldownSecondsLeft(res.cooldown_seconds || 60);
       setStep('otp');
-      window.setTimeout(() => inputRefs.current[0]?.focus(), 80);
+      window.setTimeout(() => otpInputRef.current?.focus(), 80);
     } catch (err) {
       const coded = err as Error & { code?: string };
       setError(translateError(coded?.code, coded?.message));
     } finally {
       setLoading(false);
-    }
-  }
-
-  function handleOtpChange(index: number, rawValue: string) {
-    const clean = rawValue.replace(/\D/g, '');
-    if (clean.length > 1) {
-      // Soporte de pegado rápido de 4 dígitos
-      const chars = clean.slice(0, 4).split('');
-      const next = ['', '', '', ''];
-      chars.forEach((c, idx) => {
-        next[idx] = c;
-      });
-      setOtpDigits(next);
-      const focusIdx = Math.min(3, chars.length);
-      inputRefs.current[focusIdx]?.focus();
-      return;
-    }
-
-    const next = [...otpDigits];
-    next[index] = clean;
-    setOtpDigits(next);
-    if (clean && index < 3) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  }
-
-  function handleOtpKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      e.preventDefault();
-      inputRefs.current[index - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && index < 3) {
-      e.preventDefault();
-      inputRefs.current[index + 1]?.focus();
     }
   }
 
@@ -232,9 +200,10 @@ export function VoterAuthModal({
       setError(t.otpExpiredError);
       return;
     }
-    const code = otpDigits.join('');
+    const code = otpCode.trim();
     if (!/^\d{4}$/.test(code)) {
       setError(t.errorCodes.INVALID_OTP);
+      otpInputRef.current?.focus();
       return;
     }
 
@@ -276,10 +245,12 @@ export function VoterAuthModal({
           onClick={step === 'success' ? undefined : onClose}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="auth-modal-title"
-            className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] p-6 text-slate-100 shadow-2xl"
+            className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-3xl border border-white/15 bg-[#12172e] p-6 text-slate-100 shadow-2xl outline-none"
             initial={{ opacity: 0, scale: 0.94, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -334,7 +305,7 @@ export function VoterAuthModal({
                       value={form.nombre}
                       onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                       placeholder={t.fieldNombrePh}
-                      className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400 sm:text-sm"
+                      className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400"
                     />
                   </div>
                   <div>
@@ -353,7 +324,7 @@ export function VoterAuthModal({
                       value={form.apellidos}
                       onChange={(e) => setForm({ ...form, apellidos: e.target.value })}
                       placeholder={t.fieldApellidosPh}
-                      className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400 sm:text-sm"
+                      className="w-full rounded-xl border border-white/15 bg-black/40 px-3.5 py-2.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400"
                     />
                   </div>
                 </div>
@@ -370,7 +341,7 @@ export function VoterAuthModal({
                     required
                     value={form.curso}
                     onChange={(e) => setForm({ ...form, curso: e.target.value })}
-                    className="w-full rounded-xl border border-white/15 bg-[#0d1226] px-3.5 py-2.5 text-base text-white focus:border-sky-400 sm:text-sm"
+                    className="w-full rounded-xl border border-white/15 bg-[#0d1226] px-3.5 py-2.5 text-base text-white focus:border-sky-400"
                   >
                     {settings.allowed_classes.map((cls) => (
                       <option key={cls} value={cls}>
@@ -388,15 +359,25 @@ export function VoterAuthModal({
                     {t.fieldEmail}
                   </label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 sm:top-3" />
+                    <Mail className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                     <input
                       id="voter-email"
                       type="email"
+                      inputMode="email"
                       required
                       autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       enterKeyHint="send"
+                      aria-invalid={Boolean(error)}
                       aria-describedby={
-                        settings.allowed_email_domains.length > 0 ? 'voter-domains-hint' : undefined
+                        [
+                          settings.allowed_email_domains.length > 0 ? 'voter-domains-hint' : null,
+                          error ? 'voter-form-error' : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' ') || undefined
                       }
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -405,7 +386,7 @@ export function VoterAuthModal({
                           ? `tu.nombre@${settings.allowed_email_domains[0]}`
                           : t.emailPlaceholder
                       }
-                      className="w-full rounded-xl border border-white/15 bg-black/40 py-2.5 pl-10 pr-3.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400 sm:text-sm"
+                      className="w-full rounded-xl border border-white/15 bg-black/40 py-2.5 pl-10 pr-3.5 text-base text-white placeholder:text-slate-400 focus:border-sky-400"
                     />
                   </div>
                   {settings.allowed_email_domains.length > 0 && (
@@ -421,6 +402,7 @@ export function VoterAuthModal({
 
                 {error && (
                   <div
+                    id="voter-form-error"
                     role="alert"
                     aria-live="polite"
                     className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200"
@@ -488,32 +470,26 @@ export function VoterAuthModal({
                   </div>
                 )}
 
-                {/* 4 casillas numéricas */}
-                <div className="flex justify-center gap-3 py-2">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => {
-                        inputRefs.current[idx] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={12}
-                      aria-label={t.otpDigitAriaLabel(idx + 1)}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onPaste={(e) => {
-                        const text = e.clipboardData.getData('text');
-                        if (text) {
-                          e.preventDefault();
-                          handleOtpChange(idx, text);
-                        }
-                      }}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      className="h-16 w-14 rounded-2xl border-2 border-white/20 bg-black/50 text-center font-mono text-3xl font-extrabold text-white transition focus:border-amber-400 sm:h-18 sm:w-16"
-                    />
-                  ))}
+                {/* Campo único OTP accesible (compatible con autocompletado nativo one-time-code) */}
+                <div className="flex flex-col items-center py-2">
+                  <input
+                    ref={otpInputRef}
+                    id="voter-otp-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="\d{4}"
+                    maxLength={4}
+                    enterKeyHint="done"
+                    required
+                    aria-labelledby="auth-modal-title"
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'voter-otp-error' : undefined}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="••••"
+                    className="w-56 rounded-2xl border-2 border-white/20 bg-black/50 px-4 py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.55em] text-white placeholder:tracking-[0.45em] placeholder:text-slate-600 transition focus:border-amber-400"
+                  />
                 </div>
 
                 {expiresSecondsLeft === 0 && (
@@ -528,6 +504,7 @@ export function VoterAuthModal({
 
                 {error && (
                   <div
+                    id="voter-otp-error"
                     role="alert"
                     aria-live="polite"
                     className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-500/15 p-3 text-xs text-rose-200"

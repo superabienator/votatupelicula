@@ -47,6 +47,8 @@ describe('Normalización de identidad y antifraude', () => {
     expect(translateGenreOrTag('London, england', 'va')).toBe('Londres (Anglaterra)');
     expect(translateGenreOrTag('Holiday', 'es')).toBe('Festividades');
     expect(translateGenreOrTag('Horse', 'va')).toBe('Cavalls');
+    expect(translateGenreOrTag('Rescue mission', 'es')).toBe('Misión de rescate');
+    expect(translateGenreOrTag('Rescue mission', 'va')).toBe('Missió de rescat');
     expect(localizeCampaignTitle('Cine ESO · Votación de Cartelera', 'en')).toBe(
       'School Cinema · Official Selection'
     );
